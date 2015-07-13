@@ -20,9 +20,12 @@
 #define E_DIR_PIN          28
 #define E_ENABLE_PIN       24
 
-#define E_1_STEP_PIN         36
-#define E_1_DIR_PIN          34
-#define E_1_ENABLE_PIN       30
+#define E_1_STEP_PIN       36
+#define E_1_DIR_PIN        34
+#define E_1_ENABLE_PIN     30
+
+#define MAX_SPEED       50000
+#define ACCELERATION     1000
 
 // AccelStepper library from http://www.airspayce.com/mikem/arduino/AccelStepper/
 #include <AccelStepper.h>
@@ -43,13 +46,13 @@ void setup()
   // Speeds are in steps/sec.
   // Motors are 200 steps/rev.
   // Library docs say that speeds above 1K are unreliable...
-  stepper1.setMaxSpeed(10000);  // 10K step/s = 50 rps = 30000 rpm.  
-  stepper1.setAcceleration(1000);
+  stepper1.setMaxSpeed(MAX_SPEED);  // 10K step/s = 50 rps = 30000 rpm.  
+  stepper1.setAcceleration(ACCELERATION);
   stepper1.setEnablePin(X_ENABLE_PIN);
   stepper1.setPinsInverted(false, false, true);
   
-  stepper2.setMaxSpeed(10000);
-  stepper2.setAcceleration(1000);
+  stepper2.setMaxSpeed(MAX_SPEED);
+  stepper2.setAcceleration(ACCELERATION);
   stepper2.setEnablePin(Y_ENABLE_PIN);
   stepper2.setPinsInverted(false, false, true);
 
