@@ -65,11 +65,13 @@ void setup()
   cmdAdd("L", setLeft);
   cmdAdd("R", setRight);
   cmdAdd("F", setForward);
+  cmdAdd("M", setMotor);
   cmdAdd("A", setAcceleration);
   cmdAdd("l", setLeft);
   cmdAdd("r", setRight);
   cmdAdd("f", setForward);
   cmdAdd("a", setAcceleration);
+  cmdAdd("m", setMotor);
 
   // Initialise stepper motors
   stepperL.setMaxSpeed(MAX_SPEED);
@@ -145,6 +147,33 @@ void setRight(int arg_cnt, char **args) {
 void setForward(int arg_cnt, char **args) {
   setRight(arg_cnt, args);
   setLeft(arg_cnt, args);
+}
+
+void setMotor(int arg_cnt, char **args) {
+// Set Motor Speed, format = M left_dir left_spd right_dir right_spd
+
+  int left_dir = cmdStr2Num(args[1], 10);
+  int left_speed = cmdStr2Num(args[2], 10);
+  int right_dir = cmdStr2Num(args[3], 10);
+  int right_speed = cmdStr2Num(args[4], 10);
+
+  Serial.print(args[0]);
+  Serial.print(" ");
+  Serial.print(args[1]);
+  Serial.print(" ");
+  Serial.print(args[2]);
+  Serial.print(" ");
+  Serial.print(args[3]);
+  Serial.print(" ");
+  Serial.println(args[4]);
+
+  if (left_dir != 0)
+    left_speed = left_speed * -1;
+  if (right_dir != 0)
+    right_speed = right_speed * -1;
+
+  stepperL.setSpeed(float(left_speed));
+  stepperR.setSpeed(float(right_speed));
 }
 
 void setSpeed(InterruptStepper* stepper, int arg_cnt, char **args) {
