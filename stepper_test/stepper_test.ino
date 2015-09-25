@@ -1,106 +1,137 @@
-// Pin definitions from Arduino MEGA section of 
-// https://github.com/kliment/Sprinter/blob/master/Sprinter/pins.h
+// Pin definitions from Arduino DUE variant.cpp file here:
+// C:\Users\<user>\AppData\Roaming\Arduino15\packages\arduino\hardware\sam\1.6.4\variants\arduino_due_x
+#define X_STEP_PIN         9   // PC21
+#define X_DIR_PIN          8   // PC22
+#define X_ENABLE_PIN       7   // PC23
 
-#define X_STEP_PIN         54
-#define X_DIR_PIN          55
-#define X_ENABLE_PIN       38
+#define Y_STEP_PIN         6   // PC24
+#define Y_DIR_PIN          5   // PC25
+#define Y_ENABLE_PIN       4   // PC26 (and PA29)
 
-#define Y_STEP_PIN         60
-#define Y_DIR_PIN          61
-#define Y_ENABLE_PIN       56
-
-#define MAX_SPEED       100000
-#define ACCELERATION     100
+// Other constants
+#define L_MICROSTEP        16
+#define R_MICROSTEP        16
+#define MAX_SPEED          6000
+#define ACCELERATION       1000
 
 // Serial CLI library from https://github.com/fakufaku/CmdArduino
-#include <Cmd.h>
+//#include <Cmd.h>
+// CmdUSB is a local version for the Arduino DUE that uses the other USB port (i.e. SerialUSB rather than Serial)
+#include "CmdUSB.h"
+
 #include "interruptStepper.h"
 
-InterruptStepper stepperL(3, X_DIR_PIN, X_ENABLE_PIN);
-InterruptStepper stepperR(4, Y_DIR_PIN, Y_ENABLE_PIN);
+InterruptStepper stepperL(X_STEP_PIN, X_DIR_PIN, X_ENABLE_PIN);
+InterruptStepper stepperR(Y_STEP_PIN, Y_DIR_PIN, Y_ENABLE_PIN);
 
-volatile unsigned long t3Count = 0;
-volatile unsigned long t4Count = 0;
+volatile unsigned long mLCount = 0;   // Count of pulses to left motor
+volatile unsigned long mRCount = 0;   // Count of pulses to right motor
+uint32_t mLChannel = g_APinDescription[X_STEP_PIN].ulPWMChannel;    // Left motor PWM channel
+uint32_t mRChannel = g_APinDescription[Y_STEP_PIN].ulPWMChannel;    // Right motor PWM channel
 
-ISR(TIMER3_COMPA_vect)
+// PWM Interrupt handler
+void PWM_Handler()
 {
-  PINF = 0x01;	//Toggle Pin PF0 = Mega Pin 54, A0 = X_STEP_PIN
-  t3Count++;
-}
+  // This interrupt handler is actually needed, but it is useful to monitor
+  // pulses sent to each motor and could be used to twiddle different pins if wanted.
 
-ISR(TIMER4_COMPA_vect)
-{
-  PINF = 0x40;	//Toggle Pin PF6 = Mega Pin 60, A6 = Y_STEP_PIN
-  t4Count++;
+  // Look at what events are being signalled
+  uint32_t events = PWM->PWM_ISR1;
+
+  if ((events & (1 << mLChannel)) == (1 << mLChannel))
+  {
+    mLCount++;
+  }
+    
+  else if ((events & (1 << mRChannel)) == (1 << mRChannel))
+  {
+    mRCount++;
+  }
 }
 
 void setup()
-{  
+{
+  Serial.begin(9600);
+  SerialUSB.begin(9600);
+  
+  Serial.println("Initialising...");
+  SerialUSB.println("Initialising USB...");
+
+  Serial.print("Interrupt Mask : ");
+  Serial.println(PWM->PWM_IMR1, BIN);
+
   // CMD Setup
   cmdInit(9600);
   cmdAdd("L", setLeft);
   cmdAdd("R", setRight);
   cmdAdd("F", setForward);
   cmdAdd("A", setAcceleration);
-  
-  pinMode(X_STEP_PIN,OUTPUT);
-  pinMode(Y_STEP_PIN,OUTPUT);
-  
+  cmdAdd("l", setLeft);
+  cmdAdd("r", setRight);
+  cmdAdd("f", setForward);
+  cmdAdd("a", setAcceleration);
+
   // Initialise stepper motors
-  stepperL.setMaxSpeed(MAX_SPEED); 
+  stepperL.setMaxSpeed(MAX_SPEED);
   stepperL.setAcceleration(ACCELERATION);
   stepperL.setPinsInverted(false, true);
+  stepperL.setMicrostep(L_MICROSTEP);
 
   stepperR.setMaxSpeed(MAX_SPEED);
   stepperR.setAcceleration(ACCELERATION);
   stepperR.setPinsInverted(false, true);
-  stepperR.setMicrostep(16);  
-  
+  stepperR.setMicrostep(R_MICROSTEP);
+
   // Set these just to be sure...
-  stepperL.setSpeed(0);    
-  stepperR.setSpeed(0);    
+  stepperL.setSpeed(0);
+  stepperR.setSpeed(0);
   stepperL.setEnableOutputs(false);
   stepperR.setEnableOutputs(false);
+
+  Serial.println("Ready to roll...");
 }
 
 void loop() {
   static int count = 0;
   static int last_secs = 0;
-  
+
   int secs = millis() / 1000;
   if (secs != last_secs)
   {
-	noInterrupts();
-	unsigned long t3C = t3Count;
-	t3Count = 0;
-	unsigned long t4C = t4Count;
-	t4Count = 0;
-	interrupts();
-	last_secs = secs;
-	Serial.print(t3C); 
-	Serial.print("\t");
-	Serial.print(t4C);
-	Serial.print("\t");
-	Serial.println(t4C/16);
+    noInterrupts();
+    unsigned long mLC = mLCount;
+    mLCount = 0;
+    unsigned long mRC = mRCount;
+    mRCount = 0;
+    interrupts();
+    last_secs = secs;
+    Serial.print(mLC);
+    Serial.print(" (");
+    Serial.print(mLC / L_MICROSTEP);
+    Serial.print(")\t");
+    Serial.print(mRC);
+    Serial.print(" (");
+    Serial.print(mRC / R_MICROSTEP);
+    Serial.println(")");
   }
 
   count++;
   if (count > 1000) {
     cmdPoll();
-    count = 0;    
+    count = 0;
   }
-  
+
   stepperL.run();
   stepperR.run();
 }
 
 void setAcceleration(int arg_cnt, char **args) {
-	if (arg_cnt > 1)
-	{
-		int acc = cmdStr2Num(args[1], 10);
-		stepperL.setAcceleration(float(acc));
-		stepperR.setAcceleration(float(acc));
-	}
+  if (arg_cnt > 1)
+  {
+    int acc = cmdStr2Num(args[1], 10);
+    stepperL.setAcceleration(float(acc));
+    stepperR.setAcceleration(float(acc));
+  }
 }
 
 void setLeft(int arg_cnt, char **args) {
@@ -112,8 +143,8 @@ void setRight(int arg_cnt, char **args) {
 }
 
 void setForward(int arg_cnt, char **args) {
-	setRight(arg_cnt, args);
-	setLeft(arg_cnt, args);
+  setRight(arg_cnt, args);
+  setLeft(arg_cnt, args);
 }
 
 void setSpeed(InterruptStepper* stepper, int arg_cnt, char **args) {
@@ -127,7 +158,7 @@ void setSpeed(InterruptStepper* stepper, int arg_cnt, char **args) {
   }
   else
   {
-    // if no args, stop 
+    // if no args, stop
     // and disable steppers - this saves power, but allows stepper to freewheel
     stepper->stop();
     stepper->setEnableOutputs(false);

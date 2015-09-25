@@ -2,232 +2,179 @@
 
 #include "interruptStepper.h"
 
-InterruptStepper::InterruptStepper(uint8_t timer, uint8_t dirPin, uint8_t enablePin)
+InterruptStepper::InterruptStepper(uint32_t pwmPin, uint32_t dirPin, uint32_t enablePin)
 {
-	_timer = timer;
-	_dirPin = dirPin;
-	_enablePin = enablePin;
+  _pwmPin = pwmPin;
+  _dirPin = dirPin;
+  _enablePin = enablePin;
 
-	pinMode(_dirPin, OUTPUT);
-	pinMode(_enablePin, OUTPUT);
-	
-	if (_timer==3)
-	{
-		TCCR3A = 0x03;   // Set Mode 15 Fast pwm
-		TCCR3B = 0x19;   // No prescaling on clock source
-		TIMSK3 = 0x02;   // Enable interrupt for Channel A Output Compare
-	} 
-	else if (_timer==4)
-	{
-		TCCR4A = 0x03;   // Set Mode 15 Fast pwm
-		TCCR4B = 0x19;   // No prescaling on clock source
-		TIMSK4 = 0x02;   // Enable interrupt for Channel A Output Compare
-	}
-	else
-		return;
+  pinMode(_pwmPin, OUTPUT);
+  pinMode(_dirPin, OUTPUT);
+  pinMode(_enablePin, OUTPUT);
 
-	// Initialise variables and set speed
-	_absMaxSpeed = CLKFREQ / 200;
-	_absMinSpeed = 10;              // = 20Hz, which is fast enough to be responsive to new speeds, as speed only changes at end of a cycle.
-    _maxSpeed = _absMaxSpeed;
-    _acceleration = _absMaxSpeed;
-	_dirInverted = false;
-    _enableInverted = false;
-	_microstep = 1;
-	_startSpeed = 0.0;
-	_startMillis = millis();
-	stop();
-	setEnableOutputs(false);
+  //Setup PWM
+  pmc_enable_periph_clk(PWM_INTERFACE_ID);
+  _chan = g_APinDescription[_pwmPin].ulPWMChannel;
+  PIO_Configure(g_APinDescription[_pwmPin].pPort,
+                g_APinDescription[_pwmPin].ulPinType,
+                g_APinDescription[_pwmPin].ulPin,
+                g_APinDescription[_pwmPin].ulPinConfiguration);
+  PWMC_ConfigureChannel(PWM_INTERFACE, _chan, PWM_CMR_CPRE_MCK_DIV_128, 0, 0);
+  PWMC_SetPeriod(PWM_INTERFACE, _chan, PWM_MAX_DUTY_CYCLE);
+  PWMC_SetDutyCycle(PWM_INTERFACE, _chan, PWM_MAX_DUTY_CYCLE / 2);
+  PWMC_EnableChannelIt(PWM_INTERFACE, _chan);
+  NVIC_EnableIRQ(PWM_IRQn);
+  PWMC_EnableChannel(PWM_INTERFACE, _chan);
+
+  // Initialise variables and set speed
+  _maxSpeed = ABSMAXSPEED;
+  _acceleration = ABSMAXSPEED;
+  _dirInverted = false;
+  _enableInverted = false;
+  _startSpeed = 0.0;
+  _startMillis = millis();
+  stop();
+  setEnableOutputs(false);
 }
 
 void InterruptStepper::stop()
 {
-    _currentPos = 0;
-    _targetPos = 0;
-	_currentSpeed = 0.0;
-    _targetSpeed = 0.0;
-	
-	// Disable interrupt for Channel A Output Compare
-	if (_timer==3)
-		TIMSK3 = 0x00;
-	else if (_timer==4)
-		TIMSK4 = 0x00;
+  _currentPos = 0;
+  _targetPos = 0;
+  _currentSpeed = 0.0;
+  _targetSpeed = 0.0;
+
+  // Disable the channel
+  PWMC_DisableChannel(PWM_INTERFACE, _chan);
 }
 
 boolean InterruptStepper::run()
 {
-	computeNewSpeed();
+  computeNewSpeed();
 }
 
 void InterruptStepper::setMaxSpeed(float speed)
 {
-	if ((abs(speed) * _microstep) < _absMaxSpeed)
-		_maxSpeed = abs(speed);
-	else
-		_maxSpeed = _absMaxSpeed / _microstep;
+  if (abs(speed) < ABSMAXSPEED)
+    _maxSpeed = abs(speed);
+  else
+    _maxSpeed = ABSMAXSPEED;
 }
 
 void InterruptStepper::setAcceleration(float acceleration)
 {
-	if (acceleration <= 0)
-		return;
-	
-	_acceleration = acceleration;
-	
-	// Reset speed calculation
-	_startSpeed = _currentSpeed;
-	_startMillis = millis();
+  if (acceleration <= 0)
+    return;
+
+  _acceleration = acceleration;
+
+  // Reset speed calculation
+  _startSpeed = _currentSpeed;
+  _startMillis = millis();
 }
 
 void InterruptStepper::setSpeed(float speed)
 {
-	if (abs(speed) < _maxSpeed)
-		_targetSpeed = speed;
-	else if (speed > 0)
-		_targetSpeed = _maxSpeed;
-	else
-		_targetSpeed = -_maxSpeed;
-	
-	// Reset speed calculation
-	_startSpeed = _currentSpeed;
-	_startMillis = millis();
-	
-	computeNewSpeed();
+  if (abs(speed) < _maxSpeed)
+    _targetSpeed = speed;
+  else if (speed > 0)
+    _targetSpeed = _maxSpeed;
+  else
+    _targetSpeed = -_maxSpeed;
+
+  // Reset speed calculation
+  _startSpeed = _currentSpeed;
+  _startMillis = millis();
+
+  computeNewSpeed();
 }
 
 void InterruptStepper::setEnableOutputs(bool enabled)
 {
-	if (enabled == _enableInverted)
-		digitalWrite(_enablePin,LOW);
-	else
-		digitalWrite(_enablePin,HIGH);
+  if (enabled == _enableInverted)
+    digitalWrite(_enablePin, LOW);
+  else
+    digitalWrite(_enablePin, HIGH);
 }
 
+// Note that this disables the channel
 void InterruptStepper::setMicrostep(int microstep)
 {
-	if (microstep <= 0)
-		return;
-	
-	_microstep = microstep;
-	
-	if ((_maxSpeed * _microstep) >= _absMaxSpeed)
-		_maxSpeed = _absMaxSpeed / _microstep;
-	
-	setSpeed(_targetSpeed);
+  if (microstep <= 0 || microstep > 128)
+    return;
+
+  uint32_t clock = PWM_CMR_CPRE_MCK_DIV_128;
+
+  while (microstep > 1)
+  {
+    microstep = microstep / 2;
+    clock = clock - 1;
+  }
+
+  PWMC_ConfigureChannel(PWM_INTERFACE, _chan, clock, 0, 0);
 }
 
 void InterruptStepper::setPinsInverted(bool directionInvert, bool enableInvert)
 {
-	_dirInverted = directionInvert;
-	_enableInverted = enableInvert;
+  _dirInverted = directionInvert;
+  _enableInverted = enableInvert;
 }
 
 void InterruptStepper::computeNewSpeed()
 {
-	float newSpeed;
-	float newDirection;
-	
-	// Calculate new speed and direction based on acceleration
-	if (_currentSpeed < _targetSpeed)
-	{
-		// Accelerating
-		_currentSpeed = _startSpeed + (_acceleration * (millis() - _startMillis) / 1000);
-		if (_currentSpeed > _targetSpeed)
-			_currentSpeed = _targetSpeed;
-	}
-	else if (_currentSpeed > _targetSpeed)
-	{
-		// Decelerating
-		_currentSpeed = _startSpeed - (_acceleration * (millis() - _startMillis) / 1000);
-		if (_currentSpeed < _targetSpeed)
-			_currentSpeed = _targetSpeed;
-	}
-	
-	newSpeed = abs(_currentSpeed);
-	newDirection = (_currentSpeed > 0);
-	
-	//Serial.print("New Speed = ");
-	//Serial.println(newSpeed);
-	
-	// Calculate timer parameters
-	long count = 0;   // default is zero speed
-	uint8_t clockSource = 1;
+  float newSpeed;
+  float newDirection;
 
-	if ((newSpeed * _microstep) > _absMinSpeed)
-	{
-		count = long(CLKFREQ / (newSpeed * 2 * _microstep));
-		//Serial.print("Count Start = ");
-		//Serial.println(count, HEX);
+  // Calculate new speed and direction based on acceleration
+  if (_currentSpeed < _targetSpeed)
+  {
+    // Accelerating
+    _currentSpeed = _startSpeed + (_acceleration * (millis() - _startMillis) / 1000);
+    if (_currentSpeed > _targetSpeed)
+      _currentSpeed = _targetSpeed;
+  }
+  else if (_currentSpeed > _targetSpeed)
+  {
+    // Decelerating
+    _currentSpeed = _startSpeed - (_acceleration * (millis() - _startMillis) / 1000);
+    if (_currentSpeed < _targetSpeed)
+      _currentSpeed = _targetSpeed;
+  }
 
-		while (count > 0xFFFF)
-		{
-			count = count >> 3;  // this only works for clockSource -> 2,3 as they are x8 apart.  ->4,5 are only x4 apart
-			clockSource++;
-		}
-		if (clockSource > 3)
-		{
-			Serial.print("Error, overflow");
-			stop();
-			return;
-		}
-	}
+  newSpeed = abs(_currentSpeed);
+  newDirection = (_currentSpeed > 0);
 
-	if (newDirection == _dirInverted)
-		digitalWrite(_dirPin,LOW);
-	else
-		digitalWrite(_dirPin,HIGH);
-	
-	//Serial.print("Count End = ");
-	//Serial.println(count, HEX);
-	//Serial.print("CS = ");
-	//Serial.println(clockSource, HEX);
-	
-	setTimer((uint16_t)count, clockSource, newDirection);
+  // Set Direction
+  if (newDirection == _dirInverted)
+    digitalWrite(_dirPin, LOW);
+  else
+    digitalWrite(_dirPin, HIGH);
+
+  // Set Speed
+  uint16_t period = 0;   // default is zero speed
+
+  if (newSpeed > ABSMINSPEED)
+    period = uint32_t(CLKFREQ / newSpeed);
+
+  setNewSpeed(period);
 }
 
-void InterruptStepper::setTimer(uint16_t count, uint8_t clockSource, boolean direction)
+void InterruptStepper::setNewSpeed(uint16_t period)
 {
-	// clockSource can take the following values
-	//      1 :  Clk / 1 (no prescaling)
-	//      2 :  Clk / 8 (from prescaler)
-	//      3 :  Clk / 64 (from prescaler)
-	//      4 :  Clk / 256 (from prescaler)
-	//      5 :  Clk / 1024 (from prescaler)
-	
-	if (_timer == 3)
-	{
-		if (count == 0)
-		{
-			// stopped, turn off timer interrupts
-			TIMSK3 = 0x00; 
-		}
-		else
-		{
-			// make sure timer interrupts are on
-			TIMSK3 = 0x02;
-			// set prescaler
-			TCCR3B = (TCCR3B & 0xFC) | (clockSource & 0x03); 
-			// set count
-			OCR3A = count;
-		}
-	}		
-	else if (_timer == 4)
-	{
-		if (count == 0)
-		{
-			// stopped, turn off timer interrupts
-			TIMSK4 = 0x00; 
-		}
-		else
-		{
-			// make sure timer interrupts are on
-			TIMSK4 = 0x02;
-			// set prescaler
-			TCCR4B = (TCCR4B & 0xFC) | (clockSource & 0x03); 
-			// set count
-			OCR4A = count;
-		}
-	}		
+  //Serial.println(period);
+  if (period == 0)
+  {
+    // stopped, turn off the channel
+    PWMC_DisableChannel(PWM_INTERFACE, _chan);
+  }
+  else
+  {
+    // make sure the channel is enabled
+    PWMC_EnableChannel(PWM_INTERFACE, _chan);
+    // set period
+    PWM->PWM_CH_NUM[_chan].PWM_CPRDUPD = period;
+    PWM->PWM_CH_NUM[_chan].PWM_CDTYUPD = period / 2;
+  }
 }
 
 /*
