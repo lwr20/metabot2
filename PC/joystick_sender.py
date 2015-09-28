@@ -3,7 +3,7 @@ import pygame, socket, json, struct, sys
 HOST = '10.5.5.1'    # The IP address for the robot
 PORT = 10000
 
-CONTROLLER = "XBOX 360"
+CONTROLLER = "Wireless Controller"
 
 # Define some colors
 BLACK    = (   0,   0,   0)
@@ -163,8 +163,9 @@ while done==False:
         name = joystick.get_name()
         textPrint.myprint(screen, "Joystick name: {}".format(name) )
 
-        # Don't bother with anything which isn't an XBOX controller
-        if "XBOX 360" in name:
+        # Don't bother with anything which isn't the controller we're
+        # expecting
+        if CONTROLLER in name:
             # Usually axis run in pairs, up/down for one, and left/right for
             # the other.
             axes = joystick.get_numaxes()
