@@ -15,11 +15,16 @@ class serial_port():
                             bytesize=serial.EIGHTBITS)
         self.ser.close()
         self.ser.open()
+        self.last_command = ""
 
     def send(self, command, params=[]):
         cmd = "%s %s\r" % (command, " ".join(map(str, params)))
         print "sending: %s" % cmd
-        self.ser.write(cmd)
+        # Don't bother sending this command if its the same as the last to
+        # avoid spamming the serial port
+        if cmd != self.last_command:
+            self.ser.write(cmd)
+            self.last_command = cmd
 
     def read_data(self):
         pass
