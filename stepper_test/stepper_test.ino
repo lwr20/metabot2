@@ -12,7 +12,7 @@
 #define L_MICROSTEP        16
 #define R_MICROSTEP        16
 #define MAX_SPEED          6000
-#define ACCELERATION       1000
+#define ACCELERATION       300
 
 // Serial CLI library from https://github.com/fakufaku/CmdArduino
 //#include <Cmd.h>
@@ -51,17 +51,16 @@ void PWM_Handler()
 
 void setup()
 {
-  Serial.begin(9600);
   SerialUSB.begin(9600);
-  
-  Serial.println("Initialising...");
+    
+  SerialUSB.println("Initialising...");
   SerialUSB.println("Initialising USB...");
 
-  Serial.print("Interrupt Mask : ");
-  Serial.println(PWM->PWM_IMR1, BIN);
+  SerialUSB.print("Interrupt Mask : ");
+  SerialUSB.println(PWM->PWM_IMR1, BIN);
 
   // CMD Setup
-  cmdInit(9600);
+  cmdInit(115200);
   cmdAdd("L", setLeft);
   cmdAdd("R", setRight);
   cmdAdd("F", setForward);
@@ -76,12 +75,12 @@ void setup()
   // Initialise stepper motors
   stepperL.setMaxSpeed(MAX_SPEED);
   stepperL.setAcceleration(ACCELERATION);
-  stepperL.setPinsInverted(false, true);
+  stepperL.setPinsInverted(true, false);
   stepperL.setMicrostep(L_MICROSTEP);
 
   stepperR.setMaxSpeed(MAX_SPEED);
   stepperR.setAcceleration(ACCELERATION);
-  stepperR.setPinsInverted(false, true);
+  stepperR.setPinsInverted(true, false);
   stepperR.setMicrostep(R_MICROSTEP);
 
   // Set these just to be sure...
@@ -90,7 +89,7 @@ void setup()
   stepperL.setEnableOutputs(false);
   stepperR.setEnableOutputs(false);
 
-  Serial.println("Ready to roll...");
+  SerialUSB.println("Ready to roll...");
 }
 
 void loop() {
@@ -107,14 +106,14 @@ void loop() {
     mRCount = 0;
     interrupts();
     last_secs = secs;
-    Serial.print(mLC);
-    Serial.print(" (");
-    Serial.print(mLC / L_MICROSTEP);
-    Serial.print(")\t");
-    Serial.print(mRC);
-    Serial.print(" (");
-    Serial.print(mRC / R_MICROSTEP);
-    Serial.println(")");
+    SerialUSB.print(mLC);
+    SerialUSB.print(" (");
+    SerialUSB.print(mLC / L_MICROSTEP);
+    SerialUSB.print(")\t");
+    SerialUSB.print(mRC);
+    SerialUSB.print(" (");
+    SerialUSB.print(mRC / R_MICROSTEP);
+    SerialUSB.println(")");
   }
 
   count++;
@@ -149,33 +148,6 @@ void setForward(int arg_cnt, char **args) {
   setLeft(arg_cnt, args);
 }
 
-void setMotor(int arg_cnt, char **args) {
-// Set Motor Speed, format = M left_dir left_spd right_dir right_spd
-
-  int left_dir = cmdStr2Num(args[1], 10);
-  int left_speed = cmdStr2Num(args[2], 10);
-  int right_dir = cmdStr2Num(args[3], 10);
-  int right_speed = cmdStr2Num(args[4], 10);
-
-  Serial.print(args[0]);
-  Serial.print(" ");
-  Serial.print(args[1]);
-  Serial.print(" ");
-  Serial.print(args[2]);
-  Serial.print(" ");
-  Serial.print(args[3]);
-  Serial.print(" ");
-  Serial.println(args[4]);
-
-  if (left_dir != 0)
-    left_speed = left_speed * -1;
-  if (right_dir != 0)
-    right_speed = right_speed * -1;
-
-  stepperL.setSpeed(float(left_speed));
-  stepperR.setSpeed(float(right_speed));
-}
-
 void setSpeed(InterruptStepper* stepper, int arg_cnt, char **args) {
 
   if (arg_cnt > 1)
@@ -193,4 +165,34 @@ void setSpeed(InterruptStepper* stepper, int arg_cnt, char **args) {
     stepper->setEnableOutputs(false);
   }
 }
+
+void setMotor(int arg_cnt, char **args) {
+// Set Motor Speed, format = M left_dir left_spd right_dir right_spd
+
+  int left_dir = cmdStr2Num(args[1], 10);
+  int left_speed = cmdStr2Num(args[2], 10);
+  int right_dir = cmdStr2Num(args[3], 10);
+  int right_speed = cmdStr2Num(args[4], 10);
+
+  SerialUSB.print(args[0]);
+  SerialUSB.print(" ");
+  SerialUSB.print(args[1]);
+  SerialUSB.print(" ");
+  SerialUSB.print(args[2]);
+  SerialUSB.print(" ");
+  SerialUSB.print(args[3]);
+  SerialUSB.print(" ");
+  SerialUSB.println(args[4]);
+
+  if (left_dir != 0)
+    left_speed = left_speed * -1;
+  if (right_dir != 0)
+    right_speed = right_speed * -1;
+
+  stepperL.setSpeed(float(left_speed));
+  stepperL.setEnableOutputs(true);
+  stepperR.setSpeed(float(right_speed));
+  stepperR.setEnableOutputs(true);
+}
+
 

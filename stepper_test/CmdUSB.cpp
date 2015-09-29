@@ -68,13 +68,13 @@ void cmd_display()
 {
     char buf[50];
 
-    SerialUSB.println();
+    Serial3.println();
 
     strcpy_P(buf, cmd_banner);
-    SerialUSB.println(buf);
+    Serial3.println(buf);
 
     strcpy_P(buf, cmd_prompt);
-    SerialUSB.print(buf);
+    Serial3.print(buf);
 }
 
 /**************************************************************************/
@@ -118,7 +118,7 @@ void cmd_parse(char *cmd)
 
     // command not recognized. print message and re-generate prompt.
     strcpy_P(buf, cmd_unrecog);
-    SerialUSB.println(buf);
+    Serial3.println(buf);
 
     cmd_display();
 }
@@ -132,7 +132,7 @@ void cmd_parse(char *cmd)
 /**************************************************************************/
 void cmd_handler()
 {
-    char c = SerialUSB.read();
+    char c = Serial3.read();
 
     switch (c)
     {
@@ -140,14 +140,14 @@ void cmd_handler()
         // terminate the msg and reset the msg ptr. then send
         // it to the handler for processing.
         msg[msg_index] = '\0';
-        SerialUSB.print("\r\n");
+        Serial3.print("\r\n");
         cmd_parse((char *)msg);
         msg_index = 0;
         break;
     
     case '\b':
         // backspace 
-        SerialUSB.print(c);
+        Serial3.print(c);
         if (msg_index > 0)
         {
             msg_index--;
@@ -156,7 +156,7 @@ void cmd_handler()
     
     default:
         // normal character entered. add it to the buffer
-        SerialUSB.print(c);
+        Serial3.print(c);
 		msg[msg_index] = c;
 		if (msg_index < (MAX_MSG_SIZE - 1))
 			msg_index += 1;
@@ -172,7 +172,7 @@ void cmd_handler()
 /**************************************************************************/
 void cmdPoll()
 {
-    while (SerialUSB.available())
+    while (Serial3.available())
     {
         cmd_handler();
     }
@@ -193,8 +193,8 @@ void cmdInit(uint32_t speed)
     cmd_tbl_list = NULL;
 
     // set the serial speed
-    SerialUSB.begin(speed);
-	SerialUSB.println("JP Version of CMD");
+    Serial3.begin(speed);
+	Serial3.println("JP Version of CMD");
 }
 
 /**************************************************************************/
