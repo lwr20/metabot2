@@ -56,7 +56,7 @@ static cmd_t *cmd_tbl_list, *cmd_tbl;
 
 // text strings for command prompt (stored in flash)
 const char cmd_banner[] PROGMEM = "*************** CMD *******************";
-const char cmd_prompt[] PROGMEM = "CMD >> ";
+const char cmd_prompt[] PROGMEM = ">> ";
 const char cmd_unrecog[] PROGMEM = "CMD: Command not recognized.";
 
 /**************************************************************************/
@@ -68,10 +68,10 @@ void cmd_display()
 {
     char buf[50];
 
-    Serial3.println();
+    //Serial3.println();
 
-    strcpy_P(buf, cmd_banner);
-    Serial3.println(buf);
+    //strcpy_P(buf, cmd_banner);
+    //Serial3.println(buf);
 
     strcpy_P(buf, cmd_prompt);
     Serial3.print(buf);
@@ -230,7 +230,7 @@ void cmdAdd(char *name, void (*func)(int argc, char **argv))
     different value in base 10 (decimal) and base 16 (hexadecimal).
 */
 /**************************************************************************/
-uint32_t cmdStr2Num(char *str, uint8_t base)
+int32_t cmdStr2Num(char *str, uint8_t base)
 {
     return strtol(str, NULL, base);
 }
