@@ -77,6 +77,9 @@ class Controller(threading.Thread):
         self._controlLoop = controlloop
         self._ipaddress = ipaddress
         self.conn = None
+        self.lastx = 0
+        self.lasty = 0
+        self.lastdmh = False     # Dead Man's Handle
 
     def joystick_update(self):
         """
@@ -103,21 +106,30 @@ class Controller(threading.Thread):
             logger.error("Error in json - skipping this update")
             return {}
 
+        x = self.lastx
+        y = self.lasty
+        dmh = self.lastdmh
         logger.info(control_msg)
         if control_msg["controller"] == "keypad":
             x = float(control_msg["K_RIGHT"] - control_msg["K_LEFT"])
             y = float(control_msg["K_UP"] - control_msg["K_DOWN"])
-            return {"x": x, "y": y}
+            dmh = False
         elif control_msg["controller"] == "Wireless Controller":
             x = self.deadzone(float(control_msg['sticks'][2]), 0.1)
             y = self.deadzone(float(control_msg['sticks'][3]), 0.1) * -1
-            return {"x": x, "y": y}
+            dmh = False
         elif control_msg["controller"] == "Controller (XBOX 360 For Windows)":
             x = self.deadzone(float(control_msg['sticks'][4]), 0.2)
             y = self.deadzone(float(control_msg['sticks'][3]), 0.2) * -1
-            return {"x": x, "y": y}
+            dmh = abs(float(control_msg['sticks'][2])) > 0.1
 
-        return {}
+        if x != self.lastx or y != self.lasty or dmh != self.lastdmh:
+            self.lastx = x
+            self.lasty = y
+            self.lastdmh = dmh
+            return {"x": x, "y": y, "dmh" : dmh}
+        else :
+            return {}
 
     @staticmethod
     def deadzone(val, cutoff):
