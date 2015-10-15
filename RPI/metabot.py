@@ -164,7 +164,7 @@ class Arduino(pykka.ThreadingActor):
 
     def open_serial(self):
         try:
-            self.ser = serial.Serial(port="/dev/ttyACM0",
+            self.ser = serial.Serial(port="/dev/ttyAMA0",
                                      baudrate=115200,
                                      parity=serial.PARITY_NONE,
                                      stopbits=serial.STOPBITS_ONE,
@@ -172,6 +172,7 @@ class Arduino(pykka.ThreadingActor):
             self.ser.close()
             self.ser.open()
         except serial.SerialException:
+            logger.warning("Failed to Open Serial Connection")
             self.ser = None
 
     def on_stop(self):
@@ -181,8 +182,9 @@ class Arduino(pykka.ThreadingActor):
         logger.info("sending: {}".format(cmd))
         if self.ser is not None:
             try:
-                self.ser.write(cmd)
+                self.ser.write(cmd + "\r")
             except serial.SerialException:
+                logger.warning("Serial Write Failed")
                 self.ser.close()
                 self.ser = None
         else:
@@ -212,6 +214,7 @@ class ControlLoop(pykka.ThreadingActor):
 
     def mode_update(self, newmode):
         logger.info("New Mode : ", MODES[newmode])
+        self._arduino.send_cmd("M {}".format(newmode))
 
     def on_stop(self):
         logger.info("Control Loop Actor Stopped")
@@ -249,6 +252,7 @@ def main(argv):
 
     controller.running = False
     pykka.ActorRegistry.stop_all()
+    sys.exit()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
