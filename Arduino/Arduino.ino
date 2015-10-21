@@ -18,7 +18,6 @@
 //#include <Cmd.h>
 // CmdUSB is a local version for the Arduino DUE that uses the other USB port (i.e. SerialUSB rather than Serial)
 #include "CmdUSB.h"
-
 #include "interruptStepper.h"
 
 InterruptStepper stepperL(X_STEP_PIN, X_DIR_PIN, X_ENABLE_PIN);
@@ -32,7 +31,7 @@ uint32_t mRChannel = g_APinDescription[Y_STEP_PIN].ulPWMChannel;    // Right mot
 // PWM Interrupt handler
 void PWM_Handler()
 {
-  // This interrupt handler is actually needed, but it is useful to monitor
+  // This interrupt handler isn't actually needed, but it is useful to monitor
   // pulses sent to each motor and could be used to twiddle different pins if wanted.
 
   // Look at what events are being signalled
@@ -56,22 +55,15 @@ void setup()
   SerialUSB.println("Initialising...");
   SerialUSB.println("Initialising USB...");
 
-  SerialUSB.print("Interrupt Mask : ");
-  SerialUSB.println(PWM->PWM_IMR1, BIN);
-
   // CMD Setup
   cmdInit(115200);
-  cmdAdd("L", setLeft);
-  cmdAdd("R", setRight);
   cmdAdd("F", setForward);
-  cmdAdd("M", setMotor);
-  cmdAdd("A", setAcceleration);
-  cmdAdd("l", setLeft);
-  cmdAdd("r", setRight);
   cmdAdd("f", setForward);
+  cmdAdd("A", setAcceleration);
   cmdAdd("a", setAcceleration);
-  cmdAdd("m", setMotor);
-
+  cmdAdd("M", setMode);
+  cmdAdd("m", setMode);
+  
   // Initialise stepper motors
   stepperL.setMaxSpeed(MAX_SPEED);
   stepperL.setAcceleration(ACCELERATION);
@@ -132,67 +124,58 @@ void setAcceleration(int arg_cnt, char **args) {
     int acc = cmdStr2Num(args[1], 10);
     stepperL.setAcceleration(float(acc));
     stepperR.setAcceleration(float(acc));
+
+    SerialUSB.print("A : ");
+    SerialUSB.println(args[1]);
   }
 }
 
-void setLeft(int arg_cnt, char **args) {
-  setSpeed(&stepperL, arg_cnt, args);
-}
-
-void setRight(int arg_cnt, char **args) {
-  setSpeed(&stepperR, arg_cnt, args);
+void setMode(int arg_cnt, char **args) {
+  Serial3.print("<< Setting Mode : ");
+  Serial3.println(args[1]);
+  SerialUSB.print("M : ");
+  SerialUSB.println(args[1]);
 }
 
 void setForward(int arg_cnt, char **args) {
-  setRight(arg_cnt, args);
-  setLeft(arg_cnt, args);
-}
 
-void setSpeed(InterruptStepper* stepper, int arg_cnt, char **args) {
+  float lspeed;
+  float rspeed;
 
-  if (arg_cnt > 1)
-  {
-    // if args are present, then use the first arg as the speed
-    int speed = cmdStr2Num(args[1], 10);
-    stepper->setSpeed(float(speed));
-    stepper->setEnableOutputs(true);
-  }
-  else
+  SerialUSB.print("F : ");
+  if (arg_cnt == 1)
   {
     // if no args, stop
     // and disable steppers - this saves power, but allows stepper to freewheel
-    stepper->stop();
-    stepper->setEnableOutputs(false);
+    stepperL.stop();
+    stepperL.setEnableOutputs(false);
+    stepperR.stop();
+    stepperR.setEnableOutputs(false);
+    SerialUSB.println("Stop");
   }
-}
-
-void setMotor(int arg_cnt, char **args) {
-// Set Motor Speed, format = M left_dir left_spd right_dir right_spd
-
-  int left_dir = cmdStr2Num(args[1], 10);
-  int left_speed = cmdStr2Num(args[2], 10);
-  int right_dir = cmdStr2Num(args[3], 10);
-  int right_speed = cmdStr2Num(args[4], 10);
-
-  SerialUSB.print(args[0]);
-  SerialUSB.print(" ");
-  SerialUSB.print(args[1]);
-  SerialUSB.print(" ");
-  SerialUSB.print(args[2]);
-  SerialUSB.print(" ");
-  SerialUSB.print(args[3]);
-  SerialUSB.print(" ");
-  SerialUSB.println(args[4]);
-
-  if (left_dir != 0)
-    left_speed = left_speed * -1;
-  if (right_dir != 0)
-    right_speed = right_speed * -1;
-
-  stepperL.setSpeed(float(left_speed));
-  stepperL.setEnableOutputs(true);
-  stepperR.setSpeed(float(right_speed));
-  stepperR.setEnableOutputs(true);
+  else
+  {
+    if (arg_cnt == 2)
+    {
+      lspeed = float(cmdStr2Num(args[1], 10));
+      rspeed = lspeed;
+      SerialUSB.println(lspeed);
+    }
+    else if (arg_cnt == 3)
+    {
+      lspeed = float(cmdStr2Num(args[1], 10));
+      rspeed = float(cmdStr2Num(args[2], 10));
+      SerialUSB.print(lspeed);
+      SerialUSB.print("  ");
+      SerialUSB.println(rspeed);
+    }
+    else
+      return;
+    stepperL.setSpeed(lspeed);
+    stepperL.setEnableOutputs(true);
+    stepperR.setSpeed(rspeed);
+    stepperR.setEnableOutputs(true);
+  }
 }
 
 

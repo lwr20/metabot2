@@ -14,13 +14,14 @@ WHITE = (255, 255, 255)
 
 # Class to write Joystick info to the screen.
 class Screen:
-    def __init__(self, _surface):
+    def __init__(self):
         self.x = 10
         self.y = 10
         self.line_height = 15
 
+        self.screen = pygame.display.set_mode((500, 700))
+        pygame.display.set_caption("Metabot2 Controller")
         self.font = pygame.font.Font(None, 20)
-        self.screen = _surface
 
     def myprint(self, textstring):
         textbitmap = self.font.render(textstring, True, BLACK)
@@ -44,6 +45,9 @@ class Screen:
 
         # Get count of joysticks
         joystick_count = pygame.joystick.get_count()
+
+        if sender.socket is None:
+            self.myprint("Metabot not connected")
 
         self.myprint("Number of joysticks: {}".format(joystick_count))
         self.indent()
@@ -86,26 +90,54 @@ class Screen:
             self.indent()
 
             for j in range(hats):
-                hat = joystick.get_hat(i)
+                hat = joystick.get_hat(j)
                 self.myprint("Hat {} value: {}".format(j, str(hat)))
 
             self.unindent()
             self.unindent()
+
+        if joystick_count == 0:
+            # No joysticks, so use arrow keys on keyboard instead
+            keys = pygame.key.get_pressed()
+            self.myprint("Use Keyboard Arrows instead")
+            self.indent()
+            self.myprint("Up arrow : {}".format(keys[pygame.K_UP]))
+            self.myprint("Down arrow : {}".format(keys[pygame.K_DOWN]))
+            self.myprint("Left arrow : {}".format(keys[pygame.K_LEFT]))
+            self.myprint("Right arrow : {}".format(keys[pygame.K_RIGHT]))
 
         # Go ahead and update the screen with what we've drawn.
         pygame.display.flip()
 
 
 class Sender:
-    def __init__(self, _host, port):
+    def __init__(self, bot_host, port):
+        self.host = bot_host
+        self.port = port
+        self.connect()
+
+    def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.connect((_host, port))
+        self.socket.settimeout(1.0)
+        try:
+            self.socket.connect((self.host, self.port))
+        except socket.error as msg:
+            self.socket.close()
+            self.socket = None
 
     def send(self, data):
+        if self.socket is None:
+            self.connect()
+        if self.socket is None:
+            return
         payload = json.dumps(data)
         length = len(payload)
         header = struct.pack("<L", length)
-        self.socket.sendall("%s%s" % (header, payload))
+        try:
+            self.socket.sendall("%s%s" % (header, payload))
+        except socket.error:
+            self.socket.close()
+            self.socket = None
 
     def send_update(self, joystick):
         # create a dictionary and add the controller name
@@ -138,6 +170,15 @@ class Sender:
         # send it off over the network
         self.send(simple_joy)
 
+    def send_keys(self):
+        # create a dictionary and add the controller name
+        keys = {"controller": "keypad"}
+        keystate = pygame.key.get_pressed()
+        keys["K_UP"] = keystate[pygame.K_UP]
+        keys["K_DOWN"] = keystate[pygame.K_DOWN]
+        keys["K_LEFT"] = keystate[pygame.K_LEFT]
+        keys["K_RIGHT"] = keystate[pygame.K_RIGHT]
+        self.send(keys)
 
 # ==============================
 # Main
@@ -148,18 +189,16 @@ if len(sys.argv) > 1:
 else:
     host = HOST
 
-# Create our network handler
-sender = Sender(host, PORT)
-
 # Set-up pygame
 pygame.init()
-surface = pygame.display.set_mode((500, 700))
-pygame.display.set_caption("Metabot2 Controller")
 clock = pygame.time.Clock()
 pygame.joystick.init()
 
 # Set-up pretty printer
-screen = Screen(surface)
+screen = Screen()
+
+# Create our network handler
+sender = Sender(host, PORT)
 
 controllerEvents = (pygame.JOYAXISMOTION,
                     pygame.JOYBALLMOTION,
@@ -167,17 +206,21 @@ controllerEvents = (pygame.JOYAXISMOTION,
                     pygame.JOYBUTTONUP,
                     pygame.JOYHATMOTION)
 
+arrowkeys = (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT)
+
 # -------- Main Program Loop -----------
 # Loop until the user clicks the close button.
 done = False
 while not done:
 
     # EVENT PROCESSING STEP
-    event = pygame.event.poll()  # Poll for an event
-    if event.type == pygame.QUIT:  # If user clicked close
-        done = True  # Flag that we are done so we exit this loop
-    elif event.type in controllerEvents:
-        sender.send_update(joystick=pygame.joystick.Joystick(event.dict['joy']))
+    for event in pygame.event.get():  # Poll for an event
+        if event.type == pygame.QUIT:  # If user clicked close
+            done = True  # Flag that we are done so we exit this loop
+        elif event.type in controllerEvents:
+            sender.send_update(joystick=pygame.joystick.Joystick(event.dict['joy']))
+        elif event.type in (pygame.KEYDOWN, pygame.KEYUP) and event.dict['key'] in arrowkeys:
+            sender.send_keys()
 
     # Write out info about the currently attached joysticks
     screen.update()
