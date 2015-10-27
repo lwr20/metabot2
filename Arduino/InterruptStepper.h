@@ -22,14 +22,14 @@ class InterruptStepper
 
   public:
     InterruptStepper(uint32_t pwmPin, uint32_t dirPin, uint32_t enablePin);
-    boolean run();
-    void  setMaxSpeed(float speed);
-    void  setAcceleration(float acceleration);
-    void  setSpeed(float speed);
-    void  setEnableOutputs(bool enabled);
-    void	setMicrostep(int microstep);
-    void  setPinsInverted(bool directionInvert, bool enableInvert);
-    void  stop();
+    void run();
+    void setMaxSpeed(float speed);
+    void setAcceleration(float acceleration);
+    void setSpeed(float speed);
+    void setEnableOutputs(bool enabled);
+    void setMicrostep(int microstep);
+    void setPinsInverted(bool directionInvert, bool enableInvert);
+    void stop();
 
     /*	void    moveTo(long absolute);
         void    move(long relative);

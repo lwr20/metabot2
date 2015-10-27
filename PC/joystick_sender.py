@@ -105,6 +105,7 @@ class Screen:
             self.myprint("Down arrow : {}".format(keys[pygame.K_DOWN]))
             self.myprint("Left arrow : {}".format(keys[pygame.K_LEFT]))
             self.myprint("Right arrow : {}".format(keys[pygame.K_RIGHT]))
+            self.myprint("Space : {}".format(keys[pygame.K_SPACE]))
 
         # Go ahead and update the screen with what we've drawn.
         pygame.display.flip()
@@ -115,13 +116,14 @@ class Sender:
         self.host = bot_host
         self.port = port
         self.connect()
+        self.socket = None
 
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.settimeout(1.0)
         try:
             self.socket.connect((self.host, self.port))
-        except socket.error as msg:
+        except socket.error:
             self.socket.close()
             self.socket = None
 
@@ -178,6 +180,7 @@ class Sender:
         keys["K_DOWN"] = keystate[pygame.K_DOWN]
         keys["K_LEFT"] = keystate[pygame.K_LEFT]
         keys["K_RIGHT"] = keystate[pygame.K_RIGHT]
+        keys["K_SPACE"] = keystate[pygame.K_SPACE]
         self.send(keys)
 
 # ==============================
@@ -206,7 +209,7 @@ controllerEvents = (pygame.JOYAXISMOTION,
                     pygame.JOYBUTTONUP,
                     pygame.JOYHATMOTION)
 
-arrowkeys = (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT)
+actionkeys = (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_SPACE)
 
 # -------- Main Program Loop -----------
 # Loop until the user clicks the close button.
@@ -219,7 +222,7 @@ while not done:
             done = True  # Flag that we are done so we exit this loop
         elif event.type in controllerEvents:
             sender.send_update(joystick=pygame.joystick.Joystick(event.dict['joy']))
-        elif event.type in (pygame.KEYDOWN, pygame.KEYUP) and event.dict['key'] in arrowkeys:
+        elif event.type in (pygame.KEYDOWN, pygame.KEYUP) and event.dict['key'] in actionkeys:
             sender.send_keys()
 
     # Write out info about the currently attached joysticks

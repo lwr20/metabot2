@@ -48,7 +48,7 @@ void InterruptStepper::stop()
   PWMC_DisableChannel(PWM_INTERFACE, _chan);
 }
 
-boolean InterruptStepper::run()
+void InterruptStepper::run()
 {
   computeNewSpeed();
 }
