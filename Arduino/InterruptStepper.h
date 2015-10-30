@@ -11,10 +11,10 @@
 #include <wiring.h>
 #endif
 
-#define CLKDIV 128         // Starting point for Clock Divider. Note that microstepping will change what is actually programmed
+#define CLKDIV 1024         // Starting point for Clock Divider. Note that microstepping will change what is actually programmed
 #define CLKFREQ (VARIANT_MCK / CLKDIV)
 #define ABSMAXSPEED 5000.0
-#define ABSMINSPEED 12.0   // 12Hz, which is fast enough to be responsive to new speeds, as speed only changes at end of a cycle.
+#define ABSMINSPEED 1.282   // 12Hz, which is fast enough to be responsive to new speeds, as speed only changes at end of a cycle.
                            // Also allows us to use MCK / 128 to clock the PWM
 
 class InterruptStepper

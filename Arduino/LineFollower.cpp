@@ -1,17 +1,23 @@
 #include "LineFollower.h"
+#include "CmdUSB.h"
 #include "Motors.h"
 
 #define NOPINS 5
-int analogpins[NOPINS] = { 0, 1, 2, 3, 4 };    // pin numbers of the line follower analog inputs, in order
+//int analogpins[NOPINS] = { 0, 1, 2, 3, 4 };    // pin numbers of the line follower analog inputs, in order
+int analogpins[NOPINS] = { 4, 3, 2, 1, 0 };    // pin numbers of the line follower analog inputs, in order
 
 #define DEFAULTMIN 300
 #define DEFAULTMAX 500
+#define CONFIGMAX  800
+#define CONFIGMIN  600
 
 int pinmin[NOPINS];
 int pinmax[NOPINS];
 int pinval[NOPINS];
-int pinnrm[NOPINS];
+int meanpinval;
+float pinnrm[NOPINS];
 float direrror;
+float speed = LFSPEED;
 
 #define BARLEN 110
 char bar[BARLEN];
@@ -37,6 +43,9 @@ void LineFollower::start()
 	pinMode(LFENABLEPIN, OUTPUT);
 	digitalWrite(LFENABLEPIN, 1);
 
+	// Set instant acceleration
+	motors.setAcceleration(0.0);
+
 	SerialUSB.println("Start Line Follower Mode");
 }
 
@@ -53,7 +62,27 @@ void LineFollower::printbars()
 	int i;
 	int n;
 
-	SerialUSB.print("\x1b[13F");  // Scroll back 5 lines
+  static int last_secs = 0;
+  static int loopcount = 0;
+
+  loopcount++;
+
+  int secs = millis() / 1000;
+  if (secs != last_secs)
+  {
+    SerialUSB.print("Loops per second: ");
+    SerialUSB.println(loopcount);
+    last_secs = secs;
+    loopcount = 0;
+  }
+
+  if (dmh)
+   // we are running, so don't put out any bar graph diags because these reduce
+   // the response time by a factor of 40!
+   return;
+
+   
+  SerialUSB.println("\x1b[2K");
 	for (i = 0; i < NOPINS; i++)
 	{
 		bar[pinval[i] / 12] = 0;
@@ -72,7 +101,8 @@ void LineFollower::printbars()
 
 	for (i = 0; i < NOPINS; i++)
 	{
-		bar[pinnrm[i]] = 0;
+		int endbar = round(pinnrm[i] * 80);
+		bar[endbar] = 0;
 		SerialUSB.print("\x1b[2K");  // Delete Line
 		SerialUSB.print(pinnrm[i]);
 		SerialUSB.print("\t");
@@ -82,7 +112,7 @@ void LineFollower::printbars()
 		SerialUSB.print("\t");
 		SerialUSB.print(bar);
 		SerialUSB.println();
-		bar[pinnrm[i]] = '|';
+		bar[endbar] = '|';
 	}
 	SerialUSB.println("\x1b[2K");
 	SerialUSB.print("\x1b[2K");
@@ -90,26 +120,31 @@ void LineFollower::printbars()
 	SerialUSB.print("\t");
 	SerialUSB.print(dmh);
 	SerialUSB.print("\t");
+	SerialUSB.print(meanpinval);
+	SerialUSB.print("\t");
 	SerialUSB.println(direrror);
+  SerialUSB.print("\x1b[14F");  // Scroll back 14 lines
+
 }
 
 void LineFollower::loop()
 {
 	int i;
-	int norm;
+	float norm;
 	float direction;
 	float lspeed;
 	float rspeed;
 
-	int first = 0;
+	float first = 0;
 	int firsti = 0;
-	int second = 0;
+	float second = 0;
 	int secondi = 0;
-
+	meanpinval = 0;
 
 	for (i = 0; i < NOPINS; i++)
 	{
 		pinval[i] = analogRead(analogpins[i]);
+		meanpinval += pinval[i];
 		if (config)
 		{
 			if (pinval[i] > pinmax[i])
@@ -117,11 +152,11 @@ void LineFollower::loop()
 			if (pinval[i] < pinmin[i])
 				pinmin[i] = pinval[i];
 		}
-		norm = (pinval[i] - pinmin[i]) * 100 / (pinmax[i] - pinmin[i]);
+		norm = (float)(pinval[i] - pinmin[i]) / (pinmax[i] - pinmin[i]);
 		if (norm < 0)
 			norm = 0;
-		if (norm > 100)
-			norm = 100;
+		if (norm > 1)
+			norm = 1;
 		pinnrm[i] = norm;
 
 		if (norm > first)
@@ -138,6 +173,25 @@ void LineFollower::loop()
 		}
 	}
 
+	meanpinval /= 5;
+	// Use Meanvalue to decide whether to go into config mode or not
+	// Greater than DEFAULTMAX we should reset (been lifted off board)
+	// Less than DEFAULTMIN and we should go into config mode
+	if (config && meanpinval > CONFIGMAX)
+	{
+		for (i = 0; i < NOPINS; i++)
+		{
+			pinmin[i] = DEFAULTMIN;
+			pinmax[i] = DEFAULTMAX;
+		}
+		config = false;
+	}
+	else if (!config && meanpinval < CONFIGMIN)
+	{
+		config = true;
+	}
+
+	// Calculate Direction from readings
 	direction = firsti;
 	if (secondi == (firsti + 1))
 	{
@@ -151,15 +205,24 @@ void LineFollower::loop()
 	}
 	direrror = direction - 2;
 
-	lspeed = LFSPEED;
-	rspeed = LFSPEED;
+	lspeed = speed;
+	rspeed = speed;
 	if (direrror > 0)
 	{
-		rspeed = LFSPEED * (1.0 - direrror);
+		rspeed = speed * (1.0 - direrror);
+		lspeed = speed * min(1, 2 - direrror);
 	}
 	else if (direrror < 0)
 	{
-		lspeed = LFSPEED * (1.0 + direrror);
+		lspeed = speed * (1.0 + direrror);
+		rspeed = speed * min(1, 2 + direrror);
+	}
+
+	if (first + second < 0.1)
+	{
+		// We've lost the line
+		lspeed = -speed;
+		rspeed = -speed;
 	}
 
 	motors.L->setSpeed(lspeed);
@@ -184,6 +247,11 @@ void LineFollower::cmd(int arg_cnt, char **args)
 		// Config Mode
 		configcmd(arg_cnt, args);
 		break;
+
+	case 'P':
+		// Set Speed
+		speedcmd(arg_cnt, args);
+		break;
 	}
 }
 
@@ -204,6 +272,7 @@ void LineFollower::dmhcmd(int arg_cnt, char **args)
 	else
 	{
 		motors.setEnableOutputs(true);
+    config = false;
 	}
 }
 
@@ -223,13 +292,17 @@ void LineFollower::configcmd(int arg_cnt, char **args)
 			pinmin[i] = DEFAULTMIN;
 			pinmax[i] = DEFAULTMAX;
 		}
-		// Spin the robot 360.
-	}
-	else
-	{
-		// Stop any spin that is happening and get ready to run.
 	}
 }
+
+void LineFollower::speedcmd(int arg_cnt, char **args)
+{
+	if (arg_cnt < 2)
+		return;
+
+	speed = float(cmdStr2Num(args[1], 10));
+}
+
 
 LineFollower lineFollower;
 

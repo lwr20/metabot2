@@ -226,26 +226,27 @@ class ControlLoop(pykka.ThreadingActor):
             self._arduino.send_cmd("D {0:d}".format(update["dmh"]))
 
     def mode_update(self, newmode):
-        logger.info("New Mode : ", MODES[newmode])
-        self._arduino.send_cmd("M {}".format(newmode))
+        logger.info("New Mode : {}".format(MODES[newmode]))
+        self._arduino.send_cmd("M {}".format(newmode.upper()))
 
     def on_stop(self):
         logger.info("Control Loop Actor Stopped")
 
 
 def main(argv):
-    # logging.basicConfig(level=logging.WARNING)
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.WARNING)
 
     host = DEFAULT_HOST
     try:
-        opts, args = getopt.getopt(argv, "i:")
+        opts, args = getopt.getopt(argv, "i:d")
     except getopt.GetoptError:
         print 'metabot.py -i <ip address>'
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-i':
             host = arg
+        elif opt == '-d':
+            logger.setLevel(level=logging.DEBUG)
 
     arduino = Arduino.start().proxy()
     control_loop = ControlLoop.start(arduino).proxy()

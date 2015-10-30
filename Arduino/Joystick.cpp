@@ -7,6 +7,8 @@
 void Joystick::start()
 {
 	SerialUSB.println("Start Joystick Mode");
+
+	motors.setAcceleration(ACCELERATION);
 }
 
 void Joystick::stop()
@@ -17,7 +19,9 @@ void Joystick::stop()
 void Joystick::loop()
 {
 	static int last_secs = 0;
+	static int loopcount = 0;
 
+	loopcount++;
 	int secs = millis() / 1000;
 	if (secs != last_secs)
 	{
@@ -35,7 +39,9 @@ void Joystick::loop()
 		SerialUSB.print(mRC);
 		SerialUSB.print(" (");
 		SerialUSB.print(mRC / R_MICROSTEP);
-		SerialUSB.println(")");
+		SerialUSB.print(")\t loops : ");
+		SerialUSB.println(loopcount);
+		loopcount = 0;
 	}
 }
 

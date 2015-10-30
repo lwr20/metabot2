@@ -12,7 +12,7 @@
 #include "modebase.h"
 
 #define LFENABLEPIN  33 
-#define LFSPEED 20.0
+#define LFSPEED 60.0
 
 
 class LineFollower : public ModeBase
@@ -28,6 +28,7 @@ class LineFollower : public ModeBase
 	bool config;
 	void configcmd(int arg_cnt, char **args);
 	void dmhcmd(int arg_cnt, char **args);
+	void speedcmd(int arg_cnt, char **args);
 	void printbars();
 
 
