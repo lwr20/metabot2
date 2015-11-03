@@ -54,18 +54,9 @@ MODES = {"j": "Joystick",
          "l": "Line follower",
          "3": "Three point turn",
          "b": "Bowling",
+         "p": "Proximity Alert",
          "q": "quit",
          "?": "help"}
-
-HELP_PROMPT = """ Enter Mode Values :
-j : Joystick (manual, default)
-s : Speed test
-l : Line follower
-3 : Three point turn
-b : Bowling
-q : quit
-? : This help
-"""
 
 
 class Controller(threading.Thread):
@@ -77,10 +68,10 @@ class Controller(threading.Thread):
         self._controlLoop = controlloop
         self._ipaddress = ipaddress
         self.conn = None
-        self.lastx = 0
-        self.lasty = 0
+        self.lastpos = [0, 0]
         self.lastdmh = False     # Dead Man's Handle
 
+    @property
     def joystick_update(self):
         """
         Blocking function which receives a joystick update from the network. Joystick updates are framed
@@ -105,31 +96,39 @@ class Controller(threading.Thread):
         except ValueError:
             logger.error("Error in json - skipping this update")
             return {}
-
-        x = self.lastx
-        y = self.lasty
-        dmh = self.lastdmh
         logger.info(control_msg)
+
+        pos = self.lastpos
+        dmh = self.lastdmh
+        retval = {}
+
         if control_msg["controller"] == "keypad":
-            x = float(control_msg["K_RIGHT"] - control_msg["K_LEFT"])
-            y = float(control_msg["K_UP"] - control_msg["K_DOWN"])
-            dmh = False
+            # Extract keypad data
+            pos = [float(control_msg["K_RIGHT"] - control_msg["K_LEFT"]),
+                   float(control_msg["K_UP"] - control_msg["K_DOWN"])]
+            dmh = control_msg["K_SPACE"]
+
         elif control_msg["controller"] == "Wireless Controller":
-            x = self.deadzone(float(control_msg['sticks'][2]), 0.1)
-            y = self.deadzone(float(control_msg['sticks'][3]), 0.1) * -1
-            dmh = False
+            # Extract Playstation Controller data
+            pos = [self.deadzone(float(control_msg['sticks'][2]), 0.1),
+                   self.deadzone(float(control_msg['sticks'][3]), 0.1) * -1]
+            dmh = (int(control_msg['buttons'][6]) + int(control_msg['buttons'][7])) > 0
+
         elif control_msg["controller"] == "Controller (XBOX 360 For Windows)":
-            x = self.deadzone(float(control_msg['sticks'][4]), 0.2)
-            y = self.deadzone(float(control_msg['sticks'][3]), 0.2) * -1
+            # Extract XBOX 360 controller data
+            pos = [self.deadzone(float(control_msg['sticks'][4]), 0.2),
+                   self.deadzone(float(control_msg['sticks'][3]), 0.2) * -1]
             dmh = abs(float(control_msg['sticks'][2])) > 0.1
 
-        if x != self.lastx or y != self.lasty or dmh != self.lastdmh:
-            self.lastx = x
-            self.lasty = y
+        if pos != self.lastpos:
+            self.lastpos = pos
+            retval["pos"] = pos
+
+        if dmh != self.lastdmh:
             self.lastdmh = dmh
-            return {"x": x, "y": y, "dmh" : dmh}
-        else :
-            return {}
+            retval["dmh"] = dmh
+
+        return retval
 
     @staticmethod
     def deadzone(val, cutoff):
@@ -159,8 +158,8 @@ class Controller(threading.Thread):
             if self.conn is not None:
                 logger.info("Controller Connected to {0}".format(addr))
             while self.running and self.conn is not None:
-                joystick_msg = self.joystick_update()
-                self._controlLoop.controller_update(joystick_msg)
+                controller_msg = self.joystick_update
+                self._controlLoop.controller_update(controller_msg)
 
         logger.info("Controller Thread Stopped")
 
@@ -220,13 +219,15 @@ class ControlLoop(pykka.ThreadingActor):
         return l, r
 
     def controller_update(self, update):
-        if "x" in update:
-            l, r = self._xytolr(update["x"], update["y"])
+        if "pos" in update:
+            l, r = self._xytolr(update["pos"][0], update["pos"][1])
             self._arduino.send_cmd("F {0:d} {1:d}".format(l, r))
+        if "dmh" in update:
+            self._arduino.send_cmd("D {0:d}".format(update["dmh"]))
 
     def mode_update(self, newmode):
-        logger.info("New Mode : ", MODES[newmode])
-        self._arduino.send_cmd("M {}".format(newmode))
+        logger.info("New Mode : {}".format(MODES[newmode]))
+        self._arduino.send_cmd("M {}".format(newmode.upper()))
 
     def on_stop(self):
         logger.info("Control Loop Actor Stopped")
@@ -234,21 +235,24 @@ class ControlLoop(pykka.ThreadingActor):
 
 def main(argv):
     logging.basicConfig(level=logging.WARNING)
-    # logging.basicConfig(level=logging.INFO)
+
     host = DEFAULT_HOST
     try:
-        opts, args = getopt.getopt(argv, "i:")
+        opts, args = getopt.getopt(argv, "i:d")
     except getopt.GetoptError:
         print 'metabot.py -i <ip address>'
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-i':
             host = arg
+        elif opt == '-d':
+            logger.setLevel(level=logging.DEBUG)
 
     arduino = Arduino.start().proxy()
     control_loop = ControlLoop.start(arduino).proxy()
     controller = Controller(host, control_loop)
     controller.start()
+
     print("Enter Mode Values :")
     for s in MODES:
         print s, MODES[s]
