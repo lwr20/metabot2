@@ -1,8 +1,14 @@
+#include "MPU9250.h"
+#include <Servo.h>
+#include <SPI.h>
+
+#include "Skittles.h"
 #include "LineFollower.h"
 #include "Motors.h"
 #include "Joystick.h"
 #include "CmdUSB.h"
 #include "modebase.h"
+
 
 ModeBase * mode = &joystick;
 
@@ -14,6 +20,9 @@ void setup()
   // CMD Setup - uses Serial3
   cmdInit(115200);
   
+  // Start-up the MPU9250
+  MPU9250.init();
+
   // Start your engine
   motors.init();
 
@@ -78,6 +87,10 @@ void set_mode(char modechar)
 
 	case 'L':
 		mode = &lineFollower;
+		break;
+
+	case 'S':
+		mode = &skittles;
 		break;
 	}
 	mode->start();

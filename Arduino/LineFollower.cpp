@@ -2,25 +2,7 @@
 #include "CmdUSB.h"
 #include "Motors.h"
 
-#define NOPINS 5
-//int analogpins[NOPINS] = { 0, 1, 2, 3, 4 };    // pin numbers of the line follower analog inputs, in order
 int analogpins[NOPINS] = { 4, 3, 2, 1, 0 };    // pin numbers of the line follower analog inputs, in order
-
-#define DEFAULTMIN 300
-#define DEFAULTMAX 500
-#define CONFIGMAX  800
-#define CONFIGMIN  600
-
-int pinmin[NOPINS];
-int pinmax[NOPINS];
-int pinval[NOPINS];
-int meanpinval;
-float pinnrm[NOPINS];
-float direrror;
-float speed = LFSPEED;
-
-#define BARLEN 110
-char bar[BARLEN];
 
 void LineFollower::start()
 {
@@ -30,7 +12,7 @@ void LineFollower::start()
 	memset(bar, '|', BARLEN);
 
 	// Init other variables
-	config = false;
+	state = inactive;
 	dmh = false;
 	for (i = 0; i < NOPINS; i++)
 	{
@@ -38,12 +20,15 @@ void LineFollower::start()
 		pinmax[i] = DEFAULTMAX;
 	}
 	direrror = 0;
+	speed = LFSPEED;
 
 	// Turn on line follower light
 	pinMode(LFENABLEPIN, OUTPUT);
 	digitalWrite(LFENABLEPIN, 1);
 
 	// Set instant acceleration
+	motors.stop();
+	motors.setEnableOutputs(false);
 	motors.setAcceleration(0.0);
 
 	SerialUSB.println("Start Line Follower Mode");
@@ -55,76 +40,6 @@ void LineFollower::stop()
 	digitalWrite(35, 0);
 
 	SerialUSB.println("Stop Line Follower Mode");
-}
-
-void LineFollower::printbars()
-{
-	int i;
-	int n;
-
-  static int last_secs = 0;
-  static int loopcount = 0;
-
-  loopcount++;
-
-  int secs = millis() / 1000;
-  if (secs != last_secs)
-  {
-    SerialUSB.print("Loops per second: ");
-    SerialUSB.println(loopcount);
-    last_secs = secs;
-    loopcount = 0;
-  }
-
-  if (dmh)
-   // we are running, so don't put out any bar graph diags because these reduce
-   // the response time by a factor of 40!
-   return;
-
-   
-  SerialUSB.println("\x1b[2K");
-	for (i = 0; i < NOPINS; i++)
-	{
-		bar[pinval[i] / 12] = 0;
-		SerialUSB.print("\x1b[2K");  // Delete Line
-		SerialUSB.print(pinval[i]);
-		SerialUSB.print("\t");
-		SerialUSB.print(pinmin[i]);
-		SerialUSB.print("\t");
-		SerialUSB.print(pinmax[i]);
-		SerialUSB.print("\t");
-		SerialUSB.print(bar);
-		SerialUSB.println();
-		bar[pinval[i] / 12] = '|';
-	}
-	SerialUSB.println("\x1b[2K");
-
-	for (i = 0; i < NOPINS; i++)
-	{
-		int endbar = round(pinnrm[i] * 80);
-		bar[endbar] = 0;
-		SerialUSB.print("\x1b[2K");  // Delete Line
-		SerialUSB.print(pinnrm[i]);
-		SerialUSB.print("\t");
-		SerialUSB.print(pinmin[i]);
-		SerialUSB.print("\t");
-		SerialUSB.print(pinmax[i]);
-		SerialUSB.print("\t");
-		SerialUSB.print(bar);
-		SerialUSB.println();
-		bar[endbar] = '|';
-	}
-	SerialUSB.println("\x1b[2K");
-	SerialUSB.print("\x1b[2K");
-	SerialUSB.print(config);
-	SerialUSB.print("\t");
-	SerialUSB.print(dmh);
-	SerialUSB.print("\t");
-	SerialUSB.print(meanpinval);
-	SerialUSB.print("\t");
-	SerialUSB.println(direrror);
-  SerialUSB.print("\x1b[14F");  // Scroll back 14 lines
-
 }
 
 void LineFollower::loop()
@@ -145,7 +60,7 @@ void LineFollower::loop()
 	{
 		pinval[i] = analogRead(analogpins[i]);
 		meanpinval += pinval[i];
-		if (config)
+		if (state == config)
 		{
 			if (pinval[i] > pinmax[i])
 				pinmax[i] = pinval[i];
@@ -177,18 +92,18 @@ void LineFollower::loop()
 	// Use Meanvalue to decide whether to go into config mode or not
 	// Greater than DEFAULTMAX we should reset (been lifted off board)
 	// Less than DEFAULTMIN and we should go into config mode
-	if (config && meanpinval > CONFIGMAX)
+	if (state == config && meanpinval > CONFIGMAX)
 	{
 		for (i = 0; i < NOPINS; i++)
 		{
 			pinmin[i] = DEFAULTMIN;
 			pinmax[i] = DEFAULTMAX;
 		}
-		config = false;
+		state = inactive;
 	}
-	else if (!config && meanpinval < CONFIGMIN)
+	else if (state != config && meanpinval < CONFIGMIN)
 	{
-		config = true;
+		state = config;
 	}
 
 	// Calculate Direction from readings
@@ -243,11 +158,6 @@ void LineFollower::cmd(int arg_cnt, char **args)
 		dmhcmd(arg_cnt, args);
 		break;
 
-	case 'C':
-		// Config Mode
-		configcmd(arg_cnt, args);
-		break;
-
 	case 'P':
 		// Set Speed
 		speedcmd(arg_cnt, args);
@@ -257,13 +167,11 @@ void LineFollower::cmd(int arg_cnt, char **args)
 
 void LineFollower::dmhcmd(int arg_cnt, char **args)
 {
-	int i;
-
 	if (arg_cnt < 2)
 		return;
-	
+
 	dmh = (args[1][0] == '1');
-	
+
 	if (!dmh)
 	{
 		motors.stop();
@@ -272,26 +180,8 @@ void LineFollower::dmhcmd(int arg_cnt, char **args)
 	else
 	{
 		motors.setEnableOutputs(true);
-    config = false;
-	}
-}
-
-void LineFollower::configcmd(int arg_cnt, char **args)
-{
-	int i;
-
-	if (arg_cnt < 2)
-		return;
-
-	config = args[1][0] == '1';
-
-	if (config)
-	{
-		for (i = 0; i < NOPINS; i++)
-		{
-			pinmin[i] = DEFAULTMIN;
-			pinmax[i] = DEFAULTMAX;
-		}
+		if (state == config)
+			state = active;
 	}
 }
 
@@ -302,6 +192,119 @@ void LineFollower::speedcmd(int arg_cnt, char **args)
 
 	speed = float(cmdStr2Num(args[1], 10));
 }
+
+
+void LineFollower::printbars()
+{
+	int i;
+
+	static int last_secs = 0;
+	static int loopcount = 0;
+
+	loopcount++;
+
+	int secs = millis() / 1000;
+	if (secs != last_secs)
+	{
+		SerialUSB.print("Loops per second: ");
+		SerialUSB.println(loopcount);
+		last_secs = secs;
+		loopcount = 0;
+	}
+
+	if (dmh)
+		// we are running, so don't put out any bar graph diags because these reduce
+		// the response time by a factor of 40!
+		return;
+
+
+	SerialUSB.println("\x1b[2K");
+	for (i = 0; i < NOPINS; i++)
+	{
+		bar[pinval[i] / 12] = 0;
+		SerialUSB.print("\x1b[2K");  // Delete Line
+		SerialUSB.print(pinval[i]);
+		SerialUSB.print("\t");
+		SerialUSB.print(pinmin[i]);
+		SerialUSB.print("\t");
+		SerialUSB.print(pinmax[i]);
+		SerialUSB.print("\t");
+		SerialUSB.print(bar);
+		SerialUSB.println();
+		bar[pinval[i] / 12] = '|';
+	}
+	SerialUSB.println("\x1b[2K");
+
+	for (i = 0; i < NOPINS; i++)
+	{
+		int endbar = round(pinnrm[i] * 80);
+		bar[endbar] = 0;
+		SerialUSB.print("\x1b[2K");  // Delete Line
+		SerialUSB.print(pinnrm[i]);
+		SerialUSB.print("\t");
+		SerialUSB.print(pinmin[i]);
+		SerialUSB.print("\t");
+		SerialUSB.print(pinmax[i]);
+		SerialUSB.print("\t");
+		SerialUSB.print(bar);
+		SerialUSB.println();
+		bar[endbar] = '|';
+	}
+	SerialUSB.println("\x1b[2K");
+	SerialUSB.print("\x1b[2K");
+	SerialUSB.print(isInactive());
+	SerialUSB.print("\t");
+	SerialUSB.print(state);
+	SerialUSB.print("\t");
+	SerialUSB.print(dmh);
+	SerialUSB.print("\t");
+	SerialUSB.print(meanpinval);
+	SerialUSB.print("\t");
+	SerialUSB.println(direrror);
+	SerialUSB.print("\x1b[14F");  // Scroll back 14 lines
+}
+
+void LineFollower::readarray()
+{
+	int i;
+
+	for (i = 0; i < NOPINS; i++)
+	{
+		pinval[i] = analogRead(analogpins[i]);
+	}
+}
+
+bool LineFollower::isInactive()
+{
+	// Check to see if we are off the board by blinking the led
+	// and checking whether the readings are different between
+	// off and on
+
+	int i;
+	bool retval = true;
+
+	for (i = 0; i < NOPINS; i++)
+	{
+		pinval[i] = analogRead(analogpins[i]);
+	}
+
+	digitalWrite(LFENABLEPIN, 0);
+	for (i = 0; i < NOPINS; i++)
+	{
+		//  We've turned off the LED.  If read values now go up by more than
+		// The error margin, we'll assume that we are close enough to the board to detect it
+		if (analogRead(analogpins[i]) - ERRORMARGIN > pinval[i])
+		{
+			retval = false;
+			break;
+		}
+	}
+
+	digitalWrite(LFENABLEPIN, 1);
+	return retval;
+
+}
+
 
 
 LineFollower lineFollower;
