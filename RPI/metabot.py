@@ -46,33 +46,55 @@ import getopt
 import logging
 import serial
 import pykka
+import time
 
 DEFAULT_HOST = "10.5.5.1"
 logger = logging.getLogger()
 MODES = {"j": "Joystick",
+         "r": "Reverse Joystick",
          "s": "Speed test",
          "l": "Line follower",
          "3": "Three point turn",
          "b": "Bowling",
          "p": "Proximity Alert",
-         "q": "quit",
-         "?": "help"}
+         "q": "Quit",
+         "x": "Stop",
+         ":": "Arduino Cmd",
+         "?": "Help"}
 
 
 class Controller(threading.Thread):
-    """ Represents the connection to the controller, using JSON over an IP connection  """
 
-    def __init__(self, ipaddress, controlloop):
+    def __init__(self, mode):
         super(Controller, self).__init__()
+        self._mode = mode
+
+    def set_mode(self, mode):
+        self._mode = mode
+
+    @staticmethod
+    def deadzone(val, cutoff):
+        if abs(val) < cutoff:
+            return 0
+        elif val > 0:
+            return val - cutoff
+        else:
+            return val + cutoff
+
+
+class RemoteController(Controller):
+    """ Interface to a remote controller, using JSON over an IP connection  """
+
+    def __init__(self, ipaddress, mode):
+        super(RemoteController, self).__init__(mode)
         self.running = True
-        self._controlLoop = controlloop
         self._ipaddress = ipaddress
         self.conn = None
         self.lastpos = [0, 0]
-        self.lastdmh = False     # Dead Man's Handle
+        self.lastdmh = False  # Dead Man's Handle
 
     @property
-    def joystick_update(self):
+    def update(self):
         """
         Blocking function which receives a joystick update from the network. Joystick updates are framed
         JSON - the first byte gives the length of the incoming packet.
@@ -130,17 +152,8 @@ class Controller(threading.Thread):
 
         return retval
 
-    @staticmethod
-    def deadzone(val, cutoff):
-        if abs(val) < cutoff:
-            return 0
-        elif val > 0:
-            return val - cutoff
-        else:
-            return val + cutoff
-
     def run(self):
-        logger.info("Controller Thread Running")
+        logger.info("Remote Controller Thread Running")
         port = 10000
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(1.0)
@@ -158,14 +171,76 @@ class Controller(threading.Thread):
             if self.conn is not None:
                 logger.info("Controller Connected to {0}".format(addr))
             while self.running and self.conn is not None:
-                controller_msg = self.joystick_update
-                self._controlLoop.controller_update(controller_msg)
+                controller_msg = self.update
+                self._mode.update(controller_msg)
 
-        logger.info("Controller Thread Stopped")
+        logger.info("Remote Controller Thread Stopped")
+
+
+class LocalController(Controller):
+    """ Interface to a locally attached PS controller """
+
+    def __init__(self, mode):
+        super(LocalController, self).__init__(mode)
+        self.running = True
+        self.jsdev = None
+        self.lastpos = [0, 0]
+        self.lastdmh = False  # Dead Man's Handle
+
+    def update(self):
+        retval = {}
+        # we want a copy of the values in self.lastpos, so we use list()
+        pos = list(self.lastpos)
+        dmh = self.lastdmh
+
+        try:
+            evbuf = self.jsdev.read(8)
+        except IOError:
+            self.jsdev = None
+            return retval
+
+        if evbuf:
+            _time, _value, _type, _number = struct.unpack('IhBB', evbuf)
+
+            if _type & 0x02:
+                if _number == 0x02:    # x axis
+                    pos[0] = self.deadzone(float(_value) / 32767.0, 0.1)
+                elif _number == 0x05:    # y axis
+                    pos[1] = self.deadzone(float(_value) / -32767.0, 0.1)
+                elif _number == 0x03 or _number == 0x04:    # dmh
+                    dmh = _value > 0
+
+        if pos != self.lastpos:
+            self.lastpos = pos
+            retval["pos"] = pos
+
+        if dmh != self.lastdmh:
+            self.lastdmh = dmh
+            retval["dmh"] = dmh
+
+        return retval
+
+    def run(self):
+        logger.info("Local Controller Thread Running")
+
+        logger.info("Waiting for Controller Connection")
+        while self.running:
+            try:
+                self.jsdev = open('/dev/input/js0', 'rb')
+            except IOError:
+                self.jsdev = None
+
+            while self.running and self.jsdev is not None:
+                controller_msg = self.update()
+                self._mode.update(controller_msg)
+
+            time.sleep(1)  # try to connect again in a second's time
+
+        logger.info("Local Controller Thread Stopped")
 
 
 class Arduino(pykka.ThreadingActor):
-    """ Represents the connection to the Arduino over a serial connection """
+    """ Interface to the Arduino over a serial connection """
 
     def __init__(self):
         logger.info("Arduino Actor Running")
@@ -202,12 +277,10 @@ class Arduino(pykka.ThreadingActor):
             self.open_serial()
 
 
-class ControlLoop(pykka.ThreadingActor):
-    """ Control loop that reads inputs and drives outputs """
+class Mode(pykka.ThreadingActor):
 
     def __init__(self, arduino):
-        logger.info("Control Loop Actor Running")
-        super(ControlLoop, self).__init__()
+        super(Mode, self).__init__()
         self._arduino = arduino
 
     @staticmethod
@@ -217,6 +290,13 @@ class ControlLoop(pykka.ThreadingActor):
         l = int(speed + direction)
         r = int(speed - direction)
         return l, r
+
+class JoystickMode(Mode):
+    """ Joystick Mode Controller that reads inputs and drives outputs """
+
+    def __init__(self, arduino):
+        logger.info("Start Joystick Mode")
+        super(JoystickMode, self).__init__(arduino)
 
     def controller_update(self, update):
         if "pos" in update:
@@ -229,8 +309,12 @@ class ControlLoop(pykka.ThreadingActor):
         logger.info("New Mode : {}".format(MODES[newmode]))
         self._arduino.send_cmd("M {}".format(newmode.upper()))
 
+    def send_cmd(self, cmd):
+        logger.info("Command : {}".format(cmd))
+        self._arduino.send_cmd("{}".format(cmd))
+
     def on_stop(self):
-        logger.info("Control Loop Actor Stopped")
+        logger.info("Stop Joystick Mode")
 
 
 def main(argv):
@@ -240,7 +324,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv, "i:d")
     except getopt.GetoptError:
-        print 'metabot.py -i <ip address>'
+        print 'metabot.py -d -i <ip address>'
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-i':
@@ -249,26 +333,42 @@ def main(argv):
             logger.setLevel(level=logging.DEBUG)
 
     arduino = Arduino.start().proxy()
-    control_loop = ControlLoop.start(arduino).proxy()
-    controller = Controller(host, control_loop)
-    controller.start()
+    mode = JoystickMode.start(arduino).proxy()
+    remote_controller = RemoteController(host, mode)
+    remote_controller.daemon = True
+    remote_controller.start()
+    local_controller = LocalController(mode)
+    local_controller.daemon = True
+    local_controller.start()
 
     print("Enter Mode Values :")
     for s in MODES:
         print s, MODES[s]
-    mode = "j"
-    while mode != "q":
-        mode = raw_input("New Mode :")
-        if mode == "?":
-            for s in MODES:
-                print s, MODES[s]
-        elif mode in MODES and mode != "q":
-            print("  Entering Mode : {}".format(MODES[mode]))
-            control_loop.mode_update(mode)
+    modecmd = "j"
+    try:
+        while modecmd != "q":
+            modecmd = raw_input("New Mode :")
+            if modecmd == "?":
+                for s in MODES:
+                    print s, MODES[s]
+            elif modecmd == "x":
+                mode.send_cmd("S")
+            elif len(modecmd) > 0 and modecmd[0] == ":":
+                mode.send_cmd(modecmd[1:])
+            elif modecmd in MODES and modecmd != "q":
+                print("  Entering Mode : {}".format(MODES[modecmd]))
+                mode.mode_update(modecmd)
+    except KeyboardInterrupt:
+        pass
 
-    controller.running = False
+    mode.send_cmd("S")  # Send a final Stop command
+    # May need a delay or better still some sync in here to stop
+    # the controller threads stopping before the Stop command gets out
+    remote_controller.running = False
+    local_controller.running = False
     pykka.ActorRegistry.stop_all()
     sys.exit()
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -16,8 +16,8 @@ void LineFollower::start()
 	dmh = false;
 	for (i = 0; i < NOPINS; i++)
 	{
-		pinmin[i] = DEFAULTMIN;
-		pinmax[i] = DEFAULTMAX;
+		pinmin[i] = 1024;
+		pinmax[i] = 0;
 	}
 	direrror = 0;
 	speed = LFSPEED;
@@ -28,7 +28,6 @@ void LineFollower::start()
 
 	// Set instant acceleration
 	motors.stop();
-	motors.setEnableOutputs(false);
 	motors.setAcceleration(0.0);
 
 	SerialUSB.println("Start Line Follower Mode");
@@ -36,30 +35,47 @@ void LineFollower::start()
 
 void LineFollower::stop()
 {
-	digitalWrite(33, 0);
-	digitalWrite(35, 0);
-
+	digitalWrite(LFENABLEPIN, 0);
 	SerialUSB.println("Stop Line Follower Mode");
 }
 
 void LineFollower::loop()
 {
 	int i;
-	float norm;
+	int norm;
 	float direction;
 	float lspeed;
 	float rspeed;
 
-	float first = 0;
+	int first = 0;
 	int firsti = 0;
-	float second = 0;
+	int second = 0;
 	int secondi = 0;
-	meanpinval = 0;
+	int meannorm;
 
+	if (state == inactive)
+	{
+		if (isInactive())
+		{
+			printbars();
+			return;
+		}
+		else
+		{
+			state = config;
+			for (i = 0; i < NOPINS; i++)
+			{
+				pinmax[i] = 0;
+				pinmin[i] = 1024;
+			}
+		}
+	}
+
+	// Read the light levels from the LED array
+	meannorm = 0;
 	for (i = 0; i < NOPINS; i++)
 	{
 		pinval[i] = analogRead(analogpins[i]);
-		meanpinval += pinval[i];
 		if (state == config)
 		{
 			if (pinval[i] > pinmax[i])
@@ -67,12 +83,16 @@ void LineFollower::loop()
 			if (pinval[i] < pinmin[i])
 				pinmin[i] = pinval[i];
 		}
-		norm = (float)(pinval[i] - pinmin[i]) / (pinmax[i] - pinmin[i]);
+		if (pinmax[i] == pinmin[i])
+			norm = 0;
+		else
+			norm = (pinval[i] - pinmin[i]) * 1000 / (pinmax[i] - pinmin[i]);
 		if (norm < 0)
 			norm = 0;
-		if (norm > 1)
-			norm = 1;
+		if (norm > 1000)
+			norm = 1000;
 		pinnrm[i] = norm;
+		meannorm += norm;
 
 		if (norm > first)
 		{
@@ -87,23 +107,15 @@ void LineFollower::loop()
 			secondi = i;
 		}
 	}
+	meannorm /= 5;
 
-	meanpinval /= 5;
-	// Use Meanvalue to decide whether to go into config mode or not
-	// Greater than DEFAULTMAX we should reset (been lifted off board)
-	// Less than DEFAULTMIN and we should go into config mode
-	if (state == config && meanpinval > CONFIGMAX)
+
+	// Use the mean of the norms to decide whether to go into config mode or not
+	if (meannorm > INACTIVETHRESH  && isInactive())
 	{
-		for (i = 0; i < NOPINS; i++)
-		{
-			pinmin[i] = DEFAULTMIN;
-			pinmax[i] = DEFAULTMAX;
-		}
 		state = inactive;
-	}
-	else if (state != config && meanpinval < CONFIGMIN)
-	{
-		state = config;
+		dmh = false;
+		motors.stop();
 	}
 
 	// Calculate Direction from readings
@@ -140,8 +152,11 @@ void LineFollower::loop()
 		rspeed = -speed;
 	}
 
-	motors.L->setSpeed(lspeed);
-	motors.R->setSpeed(rspeed);
+	if (dmh)
+	{
+		motors.L->setSpeed(lspeed);
+		motors.R->setSpeed(rspeed);
+	}
 
 	printbars();
 }
@@ -175,7 +190,6 @@ void LineFollower::dmhcmd(int arg_cnt, char **args)
 	if (!dmh)
 	{
 		motors.stop();
-		motors.setEnableOutputs(false);
 	}
 	else
 	{
@@ -193,6 +207,10 @@ void LineFollower::speedcmd(int arg_cnt, char **args)
 	speed = float(cmdStr2Num(args[1], 10));
 }
 
+void LineFollower::setstate(State newstate)
+{
+	state = newstate;
+}
 
 void LineFollower::printbars()
 {
@@ -237,29 +255,28 @@ void LineFollower::printbars()
 
 	for (i = 0; i < NOPINS; i++)
 	{
-		int endbar = round(pinnrm[i] * 80);
+		int endbar = round(pinnrm[i] / 12);
 		bar[endbar] = 0;
 		SerialUSB.print("\x1b[2K");  // Delete Line
-		SerialUSB.print(pinnrm[i]);
-		SerialUSB.print("\t");
-		SerialUSB.print(pinmin[i]);
-		SerialUSB.print("\t");
-		SerialUSB.print(pinmax[i]);
-		SerialUSB.print("\t");
-		SerialUSB.print(bar);
+		if (config != inactive)
+		{
+			SerialUSB.print(pinnrm[i]);
+			SerialUSB.print("\t");
+			SerialUSB.print(pinmin[i]);
+			SerialUSB.print("\t");
+			SerialUSB.print(pinmax[i]);
+			SerialUSB.print("\t");
+			SerialUSB.print(bar);
+		}
 		SerialUSB.println();
 		bar[endbar] = '|';
 	}
 	SerialUSB.println("\x1b[2K");
-	SerialUSB.print("\x1b[2K");
-	SerialUSB.print(isInactive());
-	SerialUSB.print("\t");
+	SerialUSB.print("\x1b[2Kstate: ");
 	SerialUSB.print(state);
-	SerialUSB.print("\t");
+	SerialUSB.print("\t dmh: ");
 	SerialUSB.print(dmh);
-	SerialUSB.print("\t");
-	SerialUSB.print(meanpinval);
-	SerialUSB.print("\t");
+	SerialUSB.print("\t direrror : ");
 	SerialUSB.println(direrror);
 	SerialUSB.print("\x1b[14F");  // Scroll back 14 lines
 }
@@ -276,32 +293,48 @@ void LineFollower::readarray()
 
 bool LineFollower::isInactive()
 {
-	// Check to see if we are off the board by blinking the led
-	// and checking whether the readings are different between
-	// off and on
+	// Check if we are still away from the surface.
+	// Test is that blinking the light makes a difference to all 5 LEDS
+	// AND the difference between the smallest and the largest value is greater
+	// than the random margin (so even when on the board config only starts
+	// when rolling across a line.
 
 	int i;
-	bool retval = true;
+	int darkpinval;
+	uint32_t minpinval = 1024;
+	uint32_t maxpinval = 0;
+
 
 	for (i = 0; i < NOPINS; i++)
 	{
 		pinval[i] = analogRead(analogpins[i]);
+		if (pinval[i] < minpinval)
+			minpinval = pinval[i];
+		if (pinval[i] > maxpinval)
+			maxpinval = pinval[i];
+	}
+
+	if ((maxpinval - minpinval) < SPREADMARGIN)
+	{
+		return true;
 	}
 
 	digitalWrite(LFENABLEPIN, 0);
+	delayMicroseconds(200);            // Need to wait a bit for the LED to turn off
+
 	for (i = 0; i < NOPINS; i++)
 	{
-		//  We've turned off the LED.  If read values now go up by more than
-		// The error margin, we'll assume that we are close enough to the board to detect it
-		if (analogRead(analogpins[i]) - ERRORMARGIN > pinval[i])
+		//  We've turned off the LED.  If read values don't go up by more than
+		// The error margin, we'll assume that we are not close enough to the board to detect it
+		darkpinval = analogRead(analogpins[i]);
+		if ((darkpinval - ERRORMARGIN) < pinval[i])
 		{
-			retval = false;
-			break;
+			return true;
 		}
 	}
 
 	digitalWrite(LFENABLEPIN, 1);
-	return retval;
+	return false;
 
 }
 

@@ -7,7 +7,7 @@
 void Joystick::start()
 {
 	SerialUSB.println("Start Joystick Mode");
-
+	motors.stop();
 	motors.setAcceleration(ACCELERATION);
 }
 
@@ -51,6 +51,11 @@ void Joystick::cmd(int arg_cnt, char **args)
 		setForward(arg_cnt, args);
 }
 
+void Joystick::setDirection(bool direction)
+{
+	_normdir = direction;
+}
+
 void Joystick::setForward(int arg_cnt, char **args) {
 
 	float lspeed;
@@ -83,8 +88,18 @@ void Joystick::setForward(int arg_cnt, char **args) {
 		}
 		else
 			return;
-		motors.L->setSpeed(lspeed);
-		motors.R->setSpeed(rspeed);
+		
+		if (_normdir)
+		{
+			motors.L->setSpeed(lspeed);
+			motors.R->setSpeed(rspeed);
+		}
+		else
+		{
+			// If direction is reversed then swap left and right controls and negate the speeds
+			motors.L->setSpeed(-rspeed);
+			motors.R->setSpeed(-lspeed);
+		}
 		motors.setEnableOutputs(true);
 	}
 }
