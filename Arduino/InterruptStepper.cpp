@@ -33,6 +33,9 @@ InterruptStepper::InterruptStepper(uint32_t pwmPin, uint32_t dirPin, uint32_t en
 	_enableInverted = false;
 	_startSpeed = 0.0;
 	_startMillis = millis();
+	_stopping = false;
+	_stopMillis = 0;
+
 	stop();
 	setEnableOutputs(false);
 }
@@ -43,6 +46,8 @@ void InterruptStepper::stop()
 	_targetPos = 0;
 	_currentSpeed = 0.0;
 	_targetSpeed = 0.0;
+	_stopping = true;
+	_stopMillis = millis();
 
 	// Disable the channel
 	PWMC_DisableChannel(PWM_INTERFACE, _chan);
@@ -50,7 +55,15 @@ void InterruptStepper::stop()
 
 void InterruptStepper::run()
 {
-	if (_acceleration > 0)
+	if (_stopping)
+	{
+		if (_stopMillis + STOPTIME < millis())
+		{
+			_stopping = false;
+			setEnableOutputs(false);
+		}
+	}
+	else if (_acceleration > 0)
 		computeNewSpeed();
 }
 
@@ -86,6 +99,7 @@ void InterruptStepper::setSpeed(float speed)
 	// Reset speed calculation
 	_startSpeed = _currentSpeed;
 	_startMillis = millis();
+	_stopping = false;
 
 	computeNewSpeed();
 }

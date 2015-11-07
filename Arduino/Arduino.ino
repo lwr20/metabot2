@@ -7,8 +7,7 @@
 #include "Motors.h"
 #include "Joystick.h"
 #include "CmdUSB.h"
-#include "modebase.h"
-
+#include "testmode.h"
 
 ModeBase * mode = &joystick;
 
@@ -82,7 +81,9 @@ void set_mode(char modechar)
 	switch (modechar)
 	{
 	case 'J':
+	case 'R':
 		mode = &joystick;
+		joystick.setDirection(modechar == 'J');
 		break;
 
 	case 'L':
@@ -92,6 +93,11 @@ void set_mode(char modechar)
 	case 'S':
 		mode = &skittles;
 		break;
+
+	case 'T':
+		mode = &testmode;
+		break;
+
 	}
 	mode->start();
 }

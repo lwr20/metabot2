@@ -19,9 +19,12 @@ class Joystick : public ModeBase
 	void stop();
 	void loop();
 	void cmd(int arg_cnt, char **args);
+	void setDirection(bool fwd);
 
   private:
 	void setForward(int arg_cnt, char **args);
+
+	bool _normdir;
 
 };
 
