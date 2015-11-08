@@ -41,6 +41,7 @@ void loop() {
 
   // Update motor params
   motors.run();
+
 }
 
 void process_cmd(int arg_cnt, char **args) {
