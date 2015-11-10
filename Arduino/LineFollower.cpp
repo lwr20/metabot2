@@ -55,12 +55,7 @@ void LineFollower::loop()
 
 	if (state == inactive)
 	{
-		if (isInactive())
-		{
-			printbars();
-			return;
-		}
-		else
+		if (reflection() && steadyReadings())
 		{
 			state = config;
 			for (i = 0; i < NOPINS; i++)
@@ -68,6 +63,11 @@ void LineFollower::loop()
 				pinmax[i] = 0;
 				pinmin[i] = 1024;
 			}
+		} 
+		else
+		{
+			printbars();
+			return;
 		}
 	}
 
@@ -111,7 +111,7 @@ void LineFollower::loop()
 
 
 	// Use the mean of the norms to decide whether to go into config mode or not
-	if (meannorm > INACTIVETHRESH  && isInactive())
+	if (meannorm > INACTIVETHRESH  && !reflection())
 	{
 		state = inactive;
 		dmh = false;
@@ -291,32 +291,17 @@ void LineFollower::readarray()
 	}
 }
 
-bool LineFollower::isInactive()
+bool LineFollower::reflection()
 {
-	// Check if we are still away from the surface.
+	// Check if we are away from the surface.
 	// Test is that blinking the light makes a difference to all 5 LEDS
-	// AND the difference between the smallest and the largest value is greater
-	// than the random margin (so even when on the board config only starts
-	// when rolling across a line.
 
 	int i;
-	int darkpinval;
-	uint32_t minpinval = 1024;
-	uint32_t maxpinval = 0;
-
+	uint32_t darkpinval;
 
 	for (i = 0; i < NOPINS; i++)
 	{
 		pinval[i] = analogRead(analogpins[i]);
-		if (pinval[i] < minpinval)
-			minpinval = pinval[i];
-		if (pinval[i] > maxpinval)
-			maxpinval = pinval[i];
-	}
-
-	if ((maxpinval - minpinval) < SPREADMARGIN)
-	{
-		return true;
 	}
 
 	digitalWrite(LFENABLEPIN, 0);
@@ -329,16 +314,44 @@ bool LineFollower::isInactive()
 		darkpinval = analogRead(analogpins[i]);
 		if ((darkpinval - ERRORMARGIN) < pinval[i])
 		{
-			return true;
+			digitalWrite(LFENABLEPIN, 1);
+			return false;
+		}
+	}
+	digitalWrite(LFENABLEPIN, 1);
+	return true;
+}
+
+bool LineFollower::steadyReadings()
+{
+	// Check if the readings all stay relatively constant for a period
+
+	int i;
+	int j;
+
+	static int startMillis;
+	static uint32_t startpinval[NOPINS];
+
+	for (i = 0; i < NOPINS; i++)
+	{
+		if (abs(pinval[i] - startpinval[i]) > ERRORMARGIN)
+		{
+			startMillis = millis();
+			for (j = 0; j < NOPINS; j++)
+				startpinval[j] = pinval[j];
+			return false;
 		}
 	}
 
-	digitalWrite(LFENABLEPIN, 1);
-	return false;
+	// All the pins are within ERRORMARGIN of the starting value
+	// Now check for how long
+	if ((millis() - startMillis) < STEADYTIME)
+		return false;
+
+	// Hooray, we have found the table, so ready to start configuring
+	return true;
 
 }
-
-
 
 LineFollower lineFollower;
 

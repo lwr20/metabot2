@@ -16,7 +16,8 @@
 #define BARLEN 110
 #define NOPINS 5
 #define INACTIVETHRESH 800
-#define ERRORMARGIN 10
+#define STEADYTIME 1000
+#define ERRORMARGIN 5
 #define SPREADMARGIN 300
 
 class LineFollower : public ModeBase
@@ -31,7 +32,8 @@ class LineFollower : public ModeBase
 	bool dmh;
 	void dmhcmd(int arg_cnt, char **args);
 	void speedcmd(int arg_cnt, char **args);
-	bool isInactive();
+	bool steadyReadings();
+	bool reflection();
 	void printbars();
 	void readarray();
 	

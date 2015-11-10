@@ -5,6 +5,8 @@
 
 void MPU9250Class::init()
 {
+	initvars();
+
 	// Fire up the SPI interface
 	SPI.begin(CSPIN);
 	SPI.setClockDivider(CSPIN, 84);
@@ -62,6 +64,46 @@ void MPU9250Class::init()
 	Serial3.print("Z-Axis sensitivity adjustment value "); Serial3.println(magCalibration[2], 2);
 }
 
+void MPU9250Class::initvars()
+{
+	int i;
+	Gscale = GFS_250DPS;
+	Ascale = AFS_2G;
+	Mscale = MFS_16BITS;			
+	Mmode = 0x02;					
+
+	for (i = 0; i < 3; i++)
+	{
+		magCalibration[i] = 0;
+		gyroBias[i] = 0;
+		accelBias[i] = 0;
+		eInt[i] =  0.0f;
+	}
+
+	magbias[0] = 0; // +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
+	magbias[1] = 0; //+120.;  // User environmental y-axis correction in milliGauss
+	magbias[2] = 0; //+125.;  // User environmental z-axis correction in milliGauss
+
+	GyroMeasError = PI * (40.0f / 180.0f);
+	GyroMeasDrift = PI * (0.0f / 180.0f);
+	beta = sqrt(3.0f / 4.0f) * GyroMeasError;
+	zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;
+
+	delt_t = 0;						
+	count = 0;
+	sumCount = 0;			
+	deltat = 0.0f;
+	sum = 0.0f;			
+	lastUpdate = 0;
+	firstUpdate = 0;
+	Now = 0;							
+
+	q[0] = 1.0f;	
+	for (i = 1; i < 4; i++)
+		q[i] = 0.0f;
+}
+
+
 void MPU9250Class::loop()
 {
 	// If intPin goes high, all data registers have new data
@@ -84,9 +126,6 @@ void MPU9250Class::loop()
 
 		readMagData(magCount);  // Read the x/y/z adc values
 		getMres();
-		magbias[0] = +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
-		magbias[1] = +120.;  // User environmental x-axis correction in milliGauss
-		magbias[2] = +125.;  // User environmental x-axis correction in milliGauss
 
 		// Calculate the magnetometer values in milliGauss
 		// Include factory calibration per data sheet and user environmental corrections
@@ -273,7 +312,6 @@ void MPU9250Class::getAres() {
 
 void MPU9250Class::readAccelData(int16_t * destination)
 {
-	uint8_t rawData[6];  // x/y/z accel register data stored here
 	destination[0] = readWord(ACCEL_XOUT_H);
 	destination[1] = readWord(ACCEL_YOUT_H); 
 	destination[2] = readWord(ACCEL_ZOUT_H); 
@@ -282,7 +320,6 @@ void MPU9250Class::readAccelData(int16_t * destination)
 
 void MPU9250Class::readGyroData(int16_t * destination)
 {
-	uint8_t rawData[6];  // x/y/z gyro register data stored here
 	destination[0] = readWord(GYRO_XOUT_H); 
 	destination[1] = readWord(GYRO_YOUT_H); 
 	destination[2] = readWord(GYRO_ZOUT_H); 
@@ -522,17 +559,16 @@ void MPU9250Class::calibrateMPU9250(float * dest1, float * dest2)
 // Accelerometer and gyroscope self test; check calibration wrt factory settings
 void MPU9250Class::MPU9250SelfTest(float * destination) // Should return percent deviation from factory trim values, +/- 14 or less deviation is a pass
 {
-	uint8_t rawData[6] = { 0, 0, 0, 0, 0, 0 };
 	uint8_t selfTest[6];
 	int16_t gAvg[3], aAvg[3], aSTAvg[3], gSTAvg[3];
 	float factoryTrim[6];
 	uint8_t FS = 0;
 
-	writeByte(SMPLRT_DIV, 0x00);    // Set gyro sample rate to 1 kHz
-	writeByte(CONFIG, 0x02);        // Set gyro sample rate to 1 kHz and DLPF to 92 Hz
-	writeByte(GYRO_CONFIG, 1 << FS);  // Set full scale range for the gyro to 250 dps
-	writeByte(ACCEL_CONFIG2, 0x02); // Set accelerometer rate to 1 kHz and bandwidth to 92 Hz
-	writeByte(ACCEL_CONFIG, 1 << FS); // Set full scale range for the accelerometer to 2 g
+	writeByte(SMPLRT_DIV, 0x00);		// Set gyro sample rate to 1 kHz
+	writeByte(CONFIG, 0x02);			// Set gyro sample rate to 1 kHz and DLPF to 92 Hz
+	writeByte(GYRO_CONFIG, 1 << FS);	// Set full scale range for the gyro to 250 dps
+	writeByte(ACCEL_CONFIG2, 0x02);		// Set accelerometer rate to 1 kHz and bandwidth to 92 Hz
+	writeByte(ACCEL_CONFIG, 1 << FS);	// Set full scale range for the accelerometer to 2 g
 
 	for (int ii = 0; ii < 200; ii++) {  // get average current values of gyro and acclerometer
 		aAvg[0] += readWord(ACCEL_XOUT_H);
