@@ -63,14 +63,14 @@ void MPU9250Class::init()
 }
 
 void MPU9250Class::tilt_compensation(float ax, float ay, float az, float raw_mx, float raw_my, float raw_mz){
-	(float)accXnorm = ax/sqrt(ax * ax + ay * ay + az * az);
-	(float)accYnorm = ay/sqrt(ax * ax + ay * ay + az * az);
-	(float)pitch = asin(accXnorm);
-	(float)roll = -asin(accYnorm/cos(pitch));
-	(float)magXcomp = raw_mx * cos(pitch) + raw_mz * sin(pitch);
-	(float)magYcomp = raw_mx * sin(roll) * sin(pitch) + raw_my * cos(roll) - raw_mz * sin(roll) * cos(pitch);
-	(float)heading = 180 * atan2(magYcomp, magXcomp) / PI;
-	SerialUSB.print("Compensated  Heading %7.3f  \n", heading);
+	float accXnorm = ax/sqrt(ax * ax + ay * ay + az * az);
+	float accYnorm = ay/sqrt(ax * ax + ay * ay + az * az);
+	float pitch = asin(accXnorm);
+	float roll = -asin(accYnorm/cos(pitch));
+	float magXcomp = raw_mx * cos(pitch) + raw_mz * sin(pitch);
+	float magYcomp = raw_mx * sin(roll) * sin(pitch) + raw_my * cos(roll) - raw_mz * sin(roll) * cos(pitch);
+	float heading = 180 * atan2(magYcomp, magXcomp) / PI;
+	SerialUSB.print("Compensated  Heading");  SerialUSB.println(heading);
 }
 
 void MPU9250Class::loop()
