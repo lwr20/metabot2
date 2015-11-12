@@ -150,7 +150,6 @@ void MPU9250Class::loop()
 				temperature = ((float)tempCount) / 333.87 + 21.0; // Temperature in degrees Centigrade
 				// Print temperature in degrees Centigrade
 				SerialUSB.print("Temperature is ");  SerialUSB.print(temperature, 1);  SerialUSB.println(" degrees C"); // Print T values to tenths of s degree C
-				tilt_compensation(ax, ay, az, mx, my, mz);
 			}
 			count = millis();
 		}
@@ -201,7 +200,8 @@ void MPU9250Class::loop()
 				SerialUSB.print("Roll: \t"); SerialUSB.println(roll, 2);
 
 				SerialUSB.print("rate = "); SerialUSB.print((float)sumCount / sum, 2); SerialUSB.println(" Hz");
-				SerialUSB.print("\x1b[8F");  // Scroll back 8 lines
+				tilt_compensation(ax, ay, az, mx, my, mz);
+				SerialUSB.print("\x1b[11F");  // Scroll back 11 lines
 			}
 
 			// With these settings the filter is updating at a ~145 Hz rate using the Madgwick scheme and
