@@ -12,8 +12,8 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 
 
-# Class to write Joystick info to the screen.
 class Screen:
+    """Class to write Joystick info to the screen."""
     def __init__(self):
         self.x = 10
         self.y = 10
@@ -209,7 +209,11 @@ controllerEvents = (pygame.JOYAXISMOTION,
                     pygame.JOYBUTTONUP,
                     pygame.JOYHATMOTION)
 
-actionkeys = (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_SPACE)
+actionkeys = (pygame.K_UP,
+              pygame.K_DOWN,
+              pygame.K_LEFT,
+              pygame.K_RIGHT,
+              pygame.K_SPACE)
 
 # -------- Main Program Loop -----------
 # Loop until the user clicks the close button.
@@ -221,8 +225,11 @@ while not done:
         if event.type == pygame.QUIT:  # If user clicked close
             done = True  # Flag that we are done so we exit this loop
         elif event.type in controllerEvents:
-            sender.send_update(joystick=pygame.joystick.Joystick(event.dict['joy']))
-        elif event.type in (pygame.KEYDOWN, pygame.KEYUP) and event.dict['key'] in actionkeys:
+            sender.send_update(
+                joystick=pygame.joystick.Joystick(event.dict['joy']))
+        elif event.type in (
+                pygame.KEYDOWN,
+                pygame.KEYUP) and event.dict['key'] in actionkeys:
             sender.send_keys()
 
     # Write out info about the currently attached joysticks
