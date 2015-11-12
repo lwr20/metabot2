@@ -1,51 +1,52 @@
-"""
-Module metabot.py
+# -*- coding: utf-8 -*-
+"""Module metabot.py
 
 Description :
     This module controls the Raspberry Pi at the centre of the Metabot.
     It connects to:
-    -  a controller attached to a remote PC and connected over a TCP
-        connection using JSON
-    -  an Arduino connected over a serial connection
-    -  a local user interface, normally exposed over SSH to a remote terminal.
+        -  a controller attached to a remote PC and connected over a TCP
+            connection using JSON
+        -  an Arduino connected over a serial connection
+        -  a local user interface, normally exposed over SSH to a remote
+            terminal.
 
 Design :
     metabot.py uses a combination of Pykka Actors and separate threads to
     service its different work sources.
-    -  main() creates the different actors and threads and connects them
-        together before going into a loop waiting
-        for user input at the terminal.
-    -  The Controller class runs as a separate thread.  It waits for IP
-        messages from the remote PC / Joystick
-        controller.  It then parses these messages into a common format and
-        sends the information to the ControlLoop Actor.
-    -  The ControlLoop Actor processes work from incoming work sources.
-        At the moment that is just the Controller class, but in the future
-        could be other sensors attached the RPi, timers running in other
-        threads, or other work sources.  Based on the inputs it decides
-        what actions to take and then transmits them to the Arduino.
-    -  The Arduino Actor communicates over a serial connection to the
-        Arduino.  It can be invoked using either a Pykka tell method,
-        which is a one way communication, or an ask method that will wait
-        for a reply from the Arduino and pass that back to the caller.
+        -  main() creates the different actors and threads and connects them
+            together before going into a loop waiting
+            for user input at the terminal.
+        -  The Controller class runs as a separate thread.  It waits for IP
+            messages from the remote PC / Joystick
+            controller.  It then parses these messages into a common format
+            and sends the information to the ControlLoop Actor.
+        -  The ControlLoop Actor processes work from incoming work sources.
+            At the moment that is just the Controller class, but in the future
+            could be other sensors attached the RPi, timers running in other
+            threads, or other work sources.  Based on the inputs it decides
+            what actions to take and then transmits them to the Arduino.
+        -  The Arduino Actor communicates over a serial connection to the
+            Arduino.  It can be invoked using either a Pykka tell method,
+            which is a one way communication, or an ask method that will wait
+            for a reply from the Arduino and pass that back to the caller.
 
     The role of Pykka in the code below is not at all obvious.  It only
     shows itself in the inherited classes of the two actors and in the
     initialization and termination calls in main().  However, under the
     covers it is doing quite a bit.
-    -  What looks like a simple call to a method in a Pykka actor is
-        actually a call to a Pykka proxy instead.
-    -  This serializes the parameters to the call, turns them into a
-        message and posts them to the inbox of the actor thread.
-    -  At some point later, that message is retrieved on the actor thread,
-        the parameters extracted from the message and the target method is
-        called.
-    -  Likewise, the return value from the target method is serialized,
-        turned into a message and sent back to the thread of the calling
-        code.
-    -  If the original call looks at the return parameters, then these are
-        turned into a Pykka future, which is picked-up from the value in
-        the returned message.
+        -  What looks like a simple call to a method in a Pykka actor is
+            actually a call to a Pykka proxy instead.
+        -  This serializes the parameters to the call, turns them into a
+            message and posts them to the inbox of the actor thread.
+        -  At some point later, that message is retrieved on the actor thread,
+            the parameters extracted from the message and the target method is
+            called.
+        -  Likewise, the return value from the target method is serialized,
+            turned into a message and sent back to the thread of the calling
+            code.
+        -  If the original call looks at the return parameters, then these are
+            turned into a Pykka future, which is picked-up from the value in
+            the returned message.
     The net is that we get a nice message passing co-processing scheme all
     done under the covers.
 
