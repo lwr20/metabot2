@@ -1,3 +1,9 @@
+/*  MPU9250.cpp
+*
+*   Class to control the MPU9250 motion sensor
+*
+*/
+
 #include "MPU9250.h"
 #include <SPI.h>
 
@@ -64,16 +70,17 @@ void MPU9250Class::init()
 	Serial3.print("Z-Axis sensitivity adjustment value "); Serial3.println(magCalibration[2], 2);
 }
 
-void MPU9250Class::tilt_compensation(float ax, float ay, float az, float raw_mx, float raw_my, float raw_mz){
-	float accXnorm = ax/sqrt(ax * ax + ay * ay + az * az);
-	float accYnorm = ay/sqrt(ax * ax + ay * ay + az * az);
+void MPU9250Class::tilt_compensation(float ax, float ay, float az, float raw_mx, float raw_my, float raw_mz) 
+{
+	float accXnorm = ax / sqrt(ax * ax + ay * ay + az * az);
+	float accYnorm = ay / sqrt(ax * ax + ay * ay + az * az);
 	float pitch = asin(accXnorm);
-	float roll = -asin(accYnorm/cos(pitch));
+	float roll = -asin(accYnorm / cos(pitch));
 	float magXcomp = raw_mx * cos(pitch) + raw_mz * sin(pitch);
 	float magYcomp = raw_mx * sin(roll) * sin(pitch) + raw_my * cos(roll) - raw_mz * sin(roll) * cos(pitch);
 	float heading = 180 * atan2(magYcomp, magXcomp) / PI;
-  SerialUSB.print("Compensated X");  SerialUSB.println(magXcomp);
-  SerialUSB.print("Compensated Y");  SerialUSB.println(magYcomp);
+	SerialUSB.print("Compensated X");  SerialUSB.println(magXcomp);
+	SerialUSB.print("Compensated Y");  SerialUSB.println(magYcomp);
 	SerialUSB.print("Compensated Heading");  SerialUSB.println(heading);
 }
 
@@ -90,7 +97,7 @@ void MPU9250Class::initvars()
 		magCalibration[i] = 0;
 		gyroBias[i] = 0;
 		accelBias[i] = 0;
-		eInt[i] =  0.0f;
+		eInt[i] = 0.0f;
 	}
 
 	magbias[0] = 0; // +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
@@ -161,7 +168,7 @@ void MPU9250Class::loop()
 	// This is ok by aircraft orientation standards!
 	// Pass gyro rate as rad/s
 	//MadgwickQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f,  my,  mx, mz);
-	 MahonyQuaternionUpdate(ax, ay, az, gx*PI / 180.0f, gy*PI / 180.0f, gz*PI / 180.0f, my, mx, mz);
+	MahonyQuaternionUpdate(ax, ay, az, gx*PI / 180.0f, gy*PI / 180.0f, gz*PI / 180.0f, my, mx, mz);
 
 
 	if (!AHRS) {
@@ -266,7 +273,8 @@ void MPU9250Class::loop()
 //====== Set of useful function to access acceleration. gyroscope, magnetometer, and temperature data
 //===================================================================================================================
 
-void MPU9250Class::getMres() {
+void MPU9250Class::getMres() 
+{
 	switch (Mscale)
 	{
 		// Possible magnetometer scales (and their register bit settings) are:
@@ -280,7 +288,8 @@ void MPU9250Class::getMres() {
 	}
 }
 
-void MPU9250Class::getGres() {
+void MPU9250Class::getGres() 
+{
 	switch (Gscale)
 	{
 		// Possible gyro scales (and their register bit settings) are:
@@ -301,7 +310,8 @@ void MPU9250Class::getGres() {
 	}
 }
 
-void MPU9250Class::getAres() {
+void MPU9250Class::getAres() 
+{
 	switch (Ascale)
 	{
 		// Possible accelerometer scales (and their register bit settings) are:
@@ -406,7 +416,7 @@ void MPU9250Class::initMPU9250()
 	writeByte(GYRO_CONFIG, c & ~0x02); // Clear Fchoice bits [1:0]
 	writeByte(GYRO_CONFIG, c & ~0x18); // Clear AFS bits [4:3]
 	writeByte(GYRO_CONFIG, c | Gscale << 3); // Set full scale range for the gyro
-    // writeRegister(GYRO_CONFIG, c | 0x00); // Set Fchoice for the gyro to 11 by writing its inverse to bits 1:0 of GYRO_CONFIG
+	// writeRegister(GYRO_CONFIG, c | 0x00); // Set Fchoice for the gyro to 11 by writing its inverse to bits 1:0 of GYRO_CONFIG
 
 	// Set accelerometer full-scale range configuration
 	c = readByte(ACCEL_CONFIG);
@@ -645,7 +655,6 @@ void MPU9250Class::MPU9250SelfTest(float * destination) // Should return percent
 		destination[i] = 100.0*((float)(aSTAvg[i] - aAvg[i])) / factoryTrim[i];   // Report percent differences
 		destination[i + 3] = 100.0*((float)(gSTAvg[i] - gAvg[i])) / factoryTrim[i + 3]; // Report percent differences
 	}
-
 }
 
 uint8_t MPU9250Class::readByte(uint8_t reg)

@@ -29,18 +29,14 @@ class LineFollower : public ModeBase
 	void cmd(int arg_cnt, char **args);
 
   private:
-	bool dmh;
+	bool dmh;				//Dead Man's Handle
 	void dmhcmd(int arg_cnt, char **args);
 	void speedcmd(int arg_cnt, char **args);
 	bool steadyReadings();
 	bool reflection();
 	void printbars();
-	void readarray();
-	
-	enum State { inactive, config, active };
 
-	void setstate(State);
-	
+	enum State { inactive, config, active };
 	State state;
 	uint32_t pinmin[NOPINS];
 	uint32_t pinmax[NOPINS];

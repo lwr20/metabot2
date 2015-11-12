@@ -1,4 +1,9 @@
-// Joystick control mode
+/* Joystick control mode
+*
+*  This receives speed commands from the RPi and translates them into motor
+*  controls. On the trace channel it prints out the number of interrupts seen
+*  per second = pulses/sec to the stepper motor controller
+*/
 
 #include "Joystick.h"
 #include "Motors.h"

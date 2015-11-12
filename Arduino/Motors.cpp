@@ -1,3 +1,10 @@
+/*  Motors.cpp
+*
+*   Simple class to control the left and right stepper motors.
+*   Also includes an interrupt routine to count the pulses to each motor
+*   which is used to calculate distance travelled.
+*/
+
 #include "Motors.h"
 
 volatile unsigned long mLCount = 0;   // Count of pulses to left motor
@@ -14,14 +21,9 @@ void PWM_Handler()
 	uint32_t events = PWM->PWM_ISR1;
 
 	if ((events & mLChMask) == mLChMask)
-	{
 		mLCount++;
-	}
-
 	else if ((events & mRChMask) == mRChMask)
-	{
 		mRCount++;
-	}
 }
 
 

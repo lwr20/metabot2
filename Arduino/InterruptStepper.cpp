@@ -1,4 +1,12 @@
-// InterruptStepper.cpp
+/*  InterruptStepper.cpp
+*
+*   This library sets up the PWM controller on the Arduino to drive the stepper motor controller.
+*   It includes acceleration logic to control the rate of change of the speed to stop
+*   the stepper motor losing sync.
+*
+*	Plan is to add logic to get the motor to run a certain distance (accounting for acceleration and
+*   deceleration), but that hasn't been written yet.
+*/
 
 #include "interruptStepper.h"
 

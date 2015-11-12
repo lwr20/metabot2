@@ -1,3 +1,18 @@
+/*  LineFollower.cpp
+*
+*	This mode reads the array of 5 light detectors on the base of the metabot and uses them
+*   to work out where the robot is in relation to the line.  It then controls the motors to turn the 
+*   robot back towards the line - the further the line is from the center the harder it tries to turn.
+*   If we lose track of the line altogether, then we reverse straight back until we find the line again.
+*
+*   The code includes auto-configuration.  It does this be detecting when we are on the board (combination
+*   of the light level and the reaction to the illuminating LED being turned on and off). It then detects
+*   the change in light levels between being on and off the line and uses that to scale subsequent readings.
+*
+*   Finally we've got some funky bar graph tracing, so that we can see the reaction of the light detectors
+*   easily in the trace.
+*/
+
 #include "LineFollower.h"
 #include "CmdUSB.h"
 #include "Motors.h"
@@ -55,6 +70,7 @@ void LineFollower::loop()
 
 	if (state == inactive)
 	{
+		// Check if we are on the board and ready to auto-configure
 		if (reflection() && steadyReadings())
 		{
 			state = config;
@@ -123,12 +139,10 @@ void LineFollower::loop()
 	if (secondi == (firsti + 1))
 	{
 		direction += (float)second / (first * 2);
-
 	}
 	else if (secondi == (firsti - 1))
 	{
 		direction -= (float)second / (first * 2);
-		// Drifting to the left, slow down right motor
 	}
 	direrror = direction - 2;
 
@@ -207,11 +221,6 @@ void LineFollower::speedcmd(int arg_cnt, char **args)
 	speed = float(cmdStr2Num(args[1], 10));
 }
 
-void LineFollower::setstate(State newstate)
-{
-	state = newstate;
-}
-
 void LineFollower::printbars()
 {
 	int i;
@@ -279,16 +288,6 @@ void LineFollower::printbars()
 	SerialUSB.print("\t direrror : ");
 	SerialUSB.println(direrror);
 	SerialUSB.print("\x1b[14F");  // Scroll back 14 lines
-}
-
-void LineFollower::readarray()
-{
-	int i;
-
-	for (i = 0; i < NOPINS; i++)
-	{
-		pinval[i] = analogRead(analogpins[i]);
-	}
 }
 
 bool LineFollower::reflection()

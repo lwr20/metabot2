@@ -14,8 +14,7 @@
 #define CLKDIV 1024         // Starting point for Clock Divider. Note that microstepping will change what is actually programmed
 #define CLKFREQ (VARIANT_MCK / CLKDIV)
 #define ABSMAXSPEED 5000.0
-#define ABSMINSPEED 1.282  // 12Hz, which is fast enough to be responsive to new speeds, as speed only changes at end of a cycle.
-                           // Also allows us to use MCK / 128 to clock the PWM
+#define ABSMINSPEED 1.282  // This is the slowest speed we can run without overflowing the PWM timer at the clock speed we are using.
 #define STOPTIME 1000      // Number of milliseconds to hold motor when stopping.  After this time the motor is disabled (and so can freewheel);
 
 class InterruptStepper
