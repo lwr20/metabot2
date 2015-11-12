@@ -1,5 +1,6 @@
 # metabot2
-Metabot2 is the Team Metabot entry for 2015 PiWars (www.piwars.org).
+Metabot2 is the Team Metabot (www.hardwarehacker.co.uk) entry for
+2015 PiWars (www.piwars.org).
 
 It is a Raspberry Pi powered robot, with an Arduino co-processor.
 
