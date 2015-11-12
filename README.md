@@ -4,7 +4,7 @@ Metabot2 is the Team Metabot (www.hardwarehacker.co.uk) entry for
 
 It is a Raspberry Pi powered robot, with an Arduino co-processor.
 
-The code in this repo is split into 4 directories:
+The code in this repo is split into 3 directories:
  - Arduino
     - contains the code for our Arduino Due, which does all the real-time
     stuff
