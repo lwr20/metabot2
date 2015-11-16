@@ -99,10 +99,14 @@ void LineFollower::loop()
 			if (pinval[i] < pinmin[i])
 				pinmin[i] = pinval[i];
 		}
+		// if we have previous max and min values then calculate a normalised
+		// reading that falls between these two.
 		if (pinmax[i] == pinmin[i])
 			norm = 0;
 		else
 			norm = (pinval[i] - pinmin[i]) * 1000 / (pinmax[i] - pinmin[i]);
+		// if we are not in config state, then the actual reading could lie
+		// outside the previous max and min values
 		if (norm < 0)
 			norm = 0;
 		if (norm > 1000)
@@ -110,6 +114,7 @@ void LineFollower::loop()
 		pinnrm[i] = norm;
 		meannorm += norm;
 
+		// keep track of the detector with the highest and second highest readings
 		if (norm > first)
 		{
 			second = first;
@@ -134,8 +139,12 @@ void LineFollower::loop()
 		motors.stop();
 	}
 
-	// Calculate Direction from readings
+	// Calculate Direction using the highest and second highest readings
 	direction = firsti;
+
+	// If the second highest reading is next to the highest reading
+	// then assume the line lies between them.  Use linear interpolation
+	// to figure out where. 
 	if (secondi == (firsti + 1))
 	{
 		direction += (float)second / (first * 2);
@@ -146,8 +155,12 @@ void LineFollower::loop()
 	}
 	direrror = direction - 2;
 
+	// default motor speed is full ahead
 	lspeed = speed;
 	rspeed = speed;
+
+	// set the left and right motor speeds proportional to how far off the 
+	// line we are
 	if (direrror > 0)
 	{
 		rspeed = speed * (1.0 - direrror);
@@ -161,7 +174,7 @@ void LineFollower::loop()
 
 	if (first + second < 0.1)
 	{
-		// We've lost the line
+		// We've lost the line, go into reverse
 		lspeed = -speed;
 		rspeed = -speed;
 	}
@@ -246,6 +259,7 @@ void LineFollower::printbars()
 
 
 	SerialUSB.println("\x1b[2K");
+	// Draw out the actual readings
 	for (i = 0; i < NOPINS; i++)
 	{
 		bar[pinval[i] / 12] = 0;
@@ -262,6 +276,7 @@ void LineFollower::printbars()
 	}
 	SerialUSB.println("\x1b[2K");
 
+	// Draw the normalised readings
 	for (i = 0; i < NOPINS; i++)
 	{
 		int endbar = round(pinnrm[i] / 12);
@@ -280,6 +295,7 @@ void LineFollower::printbars()
 		SerialUSB.println();
 		bar[endbar] = '|';
 	}
+	// Write out some other interesting values
 	SerialUSB.println("\x1b[2K");
 	SerialUSB.print("\x1b[2Kstate: ");
 	SerialUSB.print(state);

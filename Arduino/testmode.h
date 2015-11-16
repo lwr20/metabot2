@@ -18,6 +18,9 @@ class Testmode : public ModeBase
 	void stop();
 	void loop();
 	void cmd(int arg_cnt, char **args);
+
+private:
+	bool running;
 };
 
 extern Testmode testmode;

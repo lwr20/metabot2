@@ -348,7 +348,7 @@ void MPU9250Class::readGyroData(int16_t * destination)
 	destination[2] = readWord(GYRO_ZOUT_H);
 }
 
-void MPU9250Class::readMagData(int16_t * destination)
+bool MPU9250Class::readMagData(int16_t * destination)
 {
 	int i;
 	uint8_t rawData[7];  // x/y/z gyro register data, ST2 register stored here, must read ST2 at end of data acquisition
@@ -359,8 +359,10 @@ void MPU9250Class::readMagData(int16_t * destination)
 			destination[0] = ((int16_t)rawData[1] << 8) | rawData[0];  // Turn the MSB and LSB into a signed 16-bit value
 			destination[1] = ((int16_t)rawData[3] << 8) | rawData[2];  // Data stored as little Endian
 			destination[2] = ((int16_t)rawData[5] << 8) | rawData[4];
+			return true;
 		}
 	}
+	return false;
 }
 
 int16_t MPU9250Class::readTempData()

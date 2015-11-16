@@ -7,7 +7,7 @@
 
 #include "Motors.h"
 
-volatile unsigned long mLCount = 0;   // Count of pulses to left motor
+volatile unsigned long mLCount = 0;   // Count of pulses to left motor, Global variable as used in interrupt routine
 volatile unsigned long mRCount = 0;   // Count of pulses to right motor
 uint32_t mLChannel = g_APinDescription[X_STEP_PIN].ulPWMChannel;    // Left motor PWM channel
 uint32_t mLChMask = 0x01 << mLChannel;

@@ -1,3 +1,9 @@
+/*  Skittles.cpp
+*
+*   Mode control for the skittles event.  Basic Joystick function + servo control
+*   for the firing mechanism
+*/
+
 #include "Skittles.h"
 
 #define SERVOPIN 13
@@ -16,7 +22,7 @@ void Skittles::stop()
 
 void Skittles::loop()
 {
-
+	//ToDo
 }
 
 void Skittles::cmd(int arg_cnt, char **args)
