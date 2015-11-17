@@ -2,21 +2,29 @@
 #include "Motors.h"
 #include "MPU9250.h"
 
-#define CONFIGSPEED 10
-#define CONFIGCLICKS 6400
+#define CONFIGSPEED 5
+#define CONFIGCLICKS 1600
+
+#define XOFFSET 539
+#define YOFFSET 1060
 
 void Testmode::start()
 {
 	SerialUSB.println("Start Test Mode");
 
 	motors.stop();
-	motors.setEnableOutputs(false);
-	motors.L->setSpeed(CONFIGSPEED);
-	motors.R->setSpeed(-CONFIGSPEED);
 	mLCount = 0;
 	mRCount = 0;
 	SerialUSB.println("mx, my, mz, left_wheel, right_wheel");
-	running = true;
+	state = paused;
+
+	xmin = 10000;
+	xmax = -10000;
+	ymin = 10000;
+	ymax = -10000;
+
+	xoffset = XOFFSET;
+	yoffset = YOFFSET;
 }
 
 void Testmode::stop()
@@ -29,7 +37,7 @@ void Testmode::loop()
 	int16_t data[3];
 	int i;
 
-	if (!running)
+	if (state == stopped)
 		return;
 
 	if (mLCount > CONFIGCLICKS || mRCount > CONFIGCLICKS)
@@ -37,12 +45,23 @@ void Testmode::loop()
 		motors.L->setSpeed(0);
 		motors.R->setSpeed(0);
 		motors.setEnableOutputs(false);
-		running = false;
+		state = stopped;
 		SerialUSB.println("Data Complete");
+		SerialUSB.print("xmin : "); SerialUSB.println(xmin);
+		SerialUSB.print("xmax : "); SerialUSB.println(xmax);
+		SerialUSB.print("ymin : "); SerialUSB.println(ymin);
+		SerialUSB.print("ymax : "); SerialUSB.println(ymax);
+
+		xoffset = (xmax + xmin) / 2;
+		yoffset = (ymax + ymin) / 2;
+
+		SerialUSB.print("x offset : "); SerialUSB.println(xoffset);
+		SerialUSB.print("y offset : "); SerialUSB.println(yoffset);
+
 		return;
 	}
 
-	if (MPU9250.readMagData(data))
+	if (state == running && MPU9250.readMagData(data))
 	{
 		for (i = 0; i < 3; i++)
 		{
@@ -52,6 +71,15 @@ void Testmode::loop()
 		SerialUSB.print(mLCount);
 		SerialUSB.print(", ");
 		SerialUSB.println(mRCount);
+
+		if (data[0] < xmin)
+			xmin = data[0];
+		if (data[0] > xmax)
+			xmax = data[0];
+		if (data[1] < ymin)
+			ymin = data[1];
+		if (data[1] > ymax)
+			ymax = data[1];
 	}
 }
 
@@ -64,7 +92,20 @@ void Testmode::cmd(int arg_cnt, char **args)
 	{
 	case 'D':
 		// Dead Man's Handle
-		motors.setEnableOutputs(args[1][0] == '1');
+		if (args[1][0] == '1')
+		{
+			motors.L->setSpeed(CONFIGSPEED);
+			motors.R->setSpeed(-CONFIGSPEED);
+			motors.setEnableOutputs(true);
+			if (state != stopped)
+				state = running;
+		}
+		else
+		{
+			motors.stop();
+			if (state != stopped)
+				state = paused;
+		}
 		break;
 
 	}

@@ -24,8 +24,8 @@
 // Other constants
 #define L_MICROSTEP        16
 #define R_MICROSTEP        16
-#define MAX_SPEED          6000
-#define ACCELERATION       300
+#define MAX_SPEED          24000
+#define ACCELERATION       2000
 
 class Motors
 {

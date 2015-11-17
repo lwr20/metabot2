@@ -249,7 +249,7 @@ class LocalController(Controller):
 
             while self.running and self.jsdev is not None:
                 controller_msg = self.update()
-                self._mode.update(controller_msg)
+                self._mode.controller_update(controller_msg)
 
             time.sleep(1)  # try to connect again in a second's time
 
@@ -302,8 +302,13 @@ class Mode(pykka.ThreadingActor):
 
     @staticmethod
     def _xytolr(x, y):
-        speed = y * 1000.0
-        direction = x * 200.0
+        def sign(x):
+            if x < 0:
+                return -1
+            else:
+                return 1
+        speed = y * y * sign(y) * 1000.0      #  Use the squares of x and y to make it non-linear
+        direction = x * x * sign(x) * 100.0
         l = int(speed + direction)
         r = int(speed - direction)
         return l, r

@@ -35,12 +35,12 @@ void Motors::init()
 	// Initialise stepper motors
 	L->setMaxSpeed(MAX_SPEED);
 	L->setAcceleration(ACCELERATION);
-	L->setPinsInverted(true, false);
+	L->setPinsInverted(false, false);
 	L->setMicrostep(L_MICROSTEP);
 
 	R->setMaxSpeed(MAX_SPEED);
 	R->setAcceleration(ACCELERATION);
-	R->setPinsInverted(true, false);
+	R->setPinsInverted(false, false);
 	R->setMicrostep(R_MICROSTEP);
 
 	// Set these just to be sure...
