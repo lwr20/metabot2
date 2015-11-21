@@ -18,6 +18,16 @@ class Testmode : public ModeBase
 	void stop();
 	void loop();
 	void cmd(int arg_cnt, char **args);
+
+private:
+	enum  State { stopped, paused, running } state;
+	int16_t xmin;
+	int16_t xmax;
+	int16_t ymin;
+	int16_t ymax;
+	int16_t xoffset;
+	int16_t yoffset;
+
 };
 
 extern Testmode testmode;

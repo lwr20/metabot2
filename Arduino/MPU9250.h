@@ -53,6 +53,8 @@ class MPU9250Class
 	void init();
 	void loop();
 
+	bool readMagData(int16_t * destination);
+
  private:
 	 void initAK8963(float * destination);
 	 void initvars();
@@ -64,7 +66,6 @@ class MPU9250Class
 	 void getAres();
 	 void readAccelData(int16_t * destination);
 	 void readGyroData(int16_t * destination);
-	 void readMagData(int16_t * destination);
 	 int16_t readTempData();
 	 void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz);
 	 void MahonyQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz);

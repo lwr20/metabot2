@@ -69,7 +69,7 @@ void loop()
 	cmdPoll();
 
 	// Update motor params
-	motors.run();
+	motors.loop();
 
 }
 
