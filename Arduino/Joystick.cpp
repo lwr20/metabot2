@@ -39,11 +39,11 @@ void Joystick::loop()
 		last_secs = secs;
 		SerialUSB.print(mLC);
 		SerialUSB.print(" (");
-		SerialUSB.print(mLC / L_MICROSTEP);
+		SerialUSB.print(mLC / MICROSTEP);
 		SerialUSB.print(")\t");
 		SerialUSB.print(mRC);
 		SerialUSB.print(" (");
-		SerialUSB.print(mRC / R_MICROSTEP);
+		SerialUSB.print(mRC / MICROSTEP);
 		SerialUSB.print(")\t loops : ");
 		SerialUSB.println(loopcount);
 		loopcount = 0;
@@ -63,8 +63,8 @@ void Joystick::setDirection(bool direction)
 
 void Joystick::setForward(int arg_cnt, char **args) {
 
-	float lspeed;
-	float rspeed;
+	float speed;
+	float direction;
 
 	SerialUSB.print("F : ");
 	if (arg_cnt == 1)
@@ -72,39 +72,32 @@ void Joystick::setForward(int arg_cnt, char **args) {
 		// if no args, stop
 		// and disable steppers - this saves power, but allows stepper to freewheel
 		motors.stop();
-		motors.setEnableOutputs(false);
 		SerialUSB.println("Stop");
 	}
 	else
 	{
 		if (arg_cnt == 2)
 		{
-			lspeed = float(cmdStr2Num(args[1], 10));
-			rspeed = lspeed;
-			SerialUSB.println(lspeed);
+			speed = float(cmdStr2Num(args[1], 10));
+			direction = 0;
+			SerialUSB.println(speed);
 		}
 		else if (arg_cnt == 3)
 		{
-			lspeed = float(cmdStr2Num(args[1], 10));
-			rspeed = float(cmdStr2Num(args[2], 10));
-			SerialUSB.print(lspeed);
+			speed = float(cmdStr2Num(args[1], 10));
+			direction = float(cmdStr2Num(args[2], 10));
+			SerialUSB.print(speed);
 			SerialUSB.print("  ");
-			SerialUSB.println(rspeed);
+			SerialUSB.println(direction);
 		}
 		else
 			return;
 		
 		if (_normdir)
-		{
-			motors.L->setSpeed(lspeed);
-			motors.R->setSpeed(rspeed);
-		}
+			motors.setSpeed(speed, direction);
 		else
-		{
-			// If direction is reversed then swap left and right controls and negate the speeds
-			motors.L->setSpeed(-rspeed);
-			motors.R->setSpeed(-lspeed);
-		}
+			motors.setSpeed(-speed, -direction);
+
 		motors.setEnableOutputs(true);
 	}
 }

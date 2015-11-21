@@ -42,8 +42,7 @@ void Testmode::loop()
 
 	if (mLCount > CONFIGCLICKS || mRCount > CONFIGCLICKS)
 	{
-		motors.L->setSpeed(0);
-		motors.R->setSpeed(0);
+		motors.setSpeed(0, 0);
 		motors.setEnableOutputs(false);
 		state = stopped;
 		SerialUSB.println("Data Complete");
@@ -94,8 +93,7 @@ void Testmode::cmd(int arg_cnt, char **args)
 		// Dead Man's Handle
 		if (args[1][0] == '1')
 		{
-			motors.L->setSpeed(CONFIGSPEED);
-			motors.R->setSpeed(-CONFIGSPEED);
+			motors.setSpeed(0.0, CONFIGSPEED);
 			motors.setEnableOutputs(true);
 			if (state != stopped)
 				state = running;

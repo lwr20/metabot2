@@ -91,9 +91,9 @@ class Controller(threading.Thread):
         if abs(val) < cutoff:
             return 0
         elif val > 0:
-            return val - cutoff
+            return (val - cutoff) / (1 - cutoff)
         else:
-            return val + cutoff
+            return (val + cutoff) / (1 - cutoff)
 
 
 class RemoteController(Controller):
@@ -107,7 +107,6 @@ class RemoteController(Controller):
         self.lastpos = [0, 0]
         self.lastdmh = False  # Dead Man's Handle
 
-    @property
     def update(self):
         """
         Blocking function which receives a joystick update from the network.
@@ -188,8 +187,8 @@ class RemoteController(Controller):
             if self.conn is not None:
                 logger.info("Controller Connected to {0}".format(addr))
             while self.running and self.conn is not None:
-                controller_msg = self.update
-                self._mode.update(controller_msg)
+                controller_msg = self.update()
+                self._mode.controller_update(controller_msg)
 
         logger.info("Remote Controller Thread Stopped")
 
@@ -301,17 +300,15 @@ class Mode(pykka.ThreadingActor):
         self._arduino = arduino
 
     @staticmethod
-    def _xytolr(x, y):
+    def _xytospeeddirection(x, y):
         def sign(x):
             if x < 0:
                 return -1
             else:
                 return 1
-        speed = y * y * sign(y) * 1000.0      #  Use the squares of x and y to make it non-linear
-        direction = x * x * sign(x) * 100.0
-        l = int(speed + direction)
-        r = int(speed - direction)
-        return l, r
+        speed = y * y * sign(y) * 2000.0      #  Use the squares of x and y to make it non-linear
+        direction = x * x * sign(x) * 200.0
+        return int(speed), int(direction)
 
 
 class JoystickMode(Mode):
@@ -323,8 +320,8 @@ class JoystickMode(Mode):
 
     def controller_update(self, update):
         if "pos" in update:
-            l, r = self._xytolr(update["pos"][0], update["pos"][1])
-            self._arduino.send_cmd("F {0:d} {1:d}".format(l, r))
+            speed, direction = self._xytospeeddirection(update["pos"][0], update["pos"][1])
+            self._arduino.send_cmd("F {0:d} {1:d}".format(speed, direction))
         if "dmh" in update:
             self._arduino.send_cmd("D {0:d}".format(update["dmh"]))
 

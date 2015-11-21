@@ -33,83 +33,12 @@ InterruptStepper::InterruptStepper(uint32_t pwmPin, uint32_t dirPin, uint32_t en
 	PWMC_EnableChannelIt(PWM_INTERFACE, _chan);
 	NVIC_EnableIRQ(PWM_IRQn);
 	PWMC_EnableChannel(PWM_INTERFACE, _chan);
-
-	// Initialise variables and set speed
-	_maxSpeed = ABSMAXSPEED;
-	_acceleration = ABSMAXSPEED;
-	_dirInverted = false;
-	_enableInverted = false;
-	_startSpeed = 0.0;
-	_startMillis = millis();
-	_stopping = false;
-	_stopMillis = 0;
-
-	stop();
-	setEnableOutputs(false);
 }
 
-void InterruptStepper::stop()
+void InterruptStepper::setPinsInverted(bool directionInvert, bool enableInvert)
 {
-	_currentPos = 0;
-	_targetPos = 0;
-	_currentSpeed = 0.0;
-	_targetSpeed = 0.0;
-	_stopping = true;
-	_stopMillis = millis();
-
-	// Disable the channel
-	PWMC_DisableChannel(PWM_INTERFACE, _chan);
-}
-
-void InterruptStepper::run()
-{
-	if (_stopping)
-	{
-		if (_stopMillis + STOPTIME < millis())
-		{
-			_stopping = false;
-			setEnableOutputs(false);
-		}
-	}
-	else if (_acceleration > 0)
-		computeNewSpeed();
-}
-
-void InterruptStepper::setMaxSpeed(float speed)
-{
-	if (abs(speed) < ABSMAXSPEED)
-		_maxSpeed = abs(speed);
-	else
-		_maxSpeed = ABSMAXSPEED;
-}
-
-void InterruptStepper::setAcceleration(float acceleration)
-{
-	if (acceleration < 0)
-		return;
-
-	_acceleration = acceleration;
-
-	// Reset speed calculation
-	_startSpeed = _currentSpeed;
-	_startMillis = millis();
-}
-
-void InterruptStepper::setSpeed(float speed)
-{
-	if (abs(speed) < _maxSpeed)
-		_targetSpeed = speed;
-	else if (speed > 0)
-		_targetSpeed = _maxSpeed;
-	else
-		_targetSpeed = -_maxSpeed;
-
-	// Reset speed calculation
-	_startSpeed = _currentSpeed;
-	_startMillis = millis();
-	_stopping = false;
-
-	computeNewSpeed();
+	_dirInverted = directionInvert;
+	_enableInverted = enableInvert;
 }
 
 void InterruptStepper::setEnableOutputs(bool enabled)
@@ -137,63 +66,36 @@ void InterruptStepper::setMicrostep(int microstep)
 	PWMC_ConfigureChannel(PWM_INTERFACE, _chan, clock, 0, 0);
 }
 
-void InterruptStepper::setPinsInverted(bool directionInvert, bool enableInvert)
+void InterruptStepper::setSpeed(float speed)
 {
-	_dirInverted = directionInvert;
-	_enableInverted = enableInvert;
-}
+	float absSpeed;
+	bool direction;
 
-void InterruptStepper::computeNewSpeed()
-{
-	float newSpeed;
-	float newDirection;
-
-
-	if (_acceleration == 0)
-	{
-		// Change speed instantly
-		_currentSpeed = _targetSpeed;
-	}
-	else
-	{
-		// Calculate new speed and direction based on acceleration
-		if (_currentSpeed < _targetSpeed)
-		{
-			// Accelerating
-			_currentSpeed = _startSpeed + (_acceleration * (millis() - _startMillis) / 1000);
-			if (_currentSpeed > _targetSpeed)
-				_currentSpeed = _targetSpeed;
-		}
-		else if (_currentSpeed > _targetSpeed)
-		{
-			// Decelerating
-			_currentSpeed = _startSpeed - (_acceleration * (millis() - _startMillis) / 1000);
-			if (_currentSpeed < _targetSpeed)
-				_currentSpeed = _targetSpeed;
-		}
-	}
-
-	newSpeed = abs(_currentSpeed);
-	newDirection = (_currentSpeed > 0);
+	absSpeed = abs(speed);
+	direction = (speed > 0);
 
 	// Set Direction
-	if (newDirection == _dirInverted)
+	if (direction == _dirInverted)
 		digitalWrite(_dirPin, LOW);
 	else
 		digitalWrite(_dirPin, HIGH);
 
-	// Set Speed
-	uint16_t period = 0;   // default is zero speed
+	// Calculate period of PWM output
+	uint32_t period = MAXPERIODTICKS;
 
-	if (newSpeed > ABSMINSPEED)
-		period = uint32_t(CLKFREQ / newSpeed);
+	if (absSpeed >= 1)
+		period = CLKFREQ / absSpeed;
 
-	setNewSpeed(period);
+	if (period >= MAXPERIODTICKS)
+		period = 0;					// use 0  length period to mean stop
+	else if (period < MINPERIODTICKS)
+		period = MINPERIODTICKS;   // Fastest we can go
+
+	setPWMPeriod((uint16_t)period);
 }
 
-void InterruptStepper::setNewSpeed(uint16_t period)
+void InterruptStepper::setPWMPeriod(uint16_t period)
 {
-	//Serial.println(period);
 	if (period == 0)
 	{
 		// stopped, turn off the channel
@@ -209,49 +111,3 @@ void InterruptStepper::setNewSpeed(uint16_t period)
 	}
 }
 
-/*
-void InterruptStepper::moveTo(long absolute)
-{
-}
-
-void InterruptStepper::move(long relative)
-{
-}
-
-boolean InterruptStepper::runSpeed()
-{
-}
-
-float InterruptStepper::speed()
-{
-}
-
-long InterruptStepper::distanceToGo()
-{
-}
-
-long InterruptStepper::targetPosition()
-{
-}
-
-long InterruptStepper::currentPosition()
-{
-}
-
-void InterruptStepper::setCurrentPosition(long position)
-{
-}
-
-void InterruptStepper::runToPosition()
-{
-}
-
-boolean InterruptStepper::runSpeedToPosition()
-{
-}
-
-void InterruptStepper::runToNewPosition(long position)
-{
-}
-
-*/

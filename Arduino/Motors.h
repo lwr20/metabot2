@@ -22,33 +22,63 @@
 #define Y_ENABLE_PIN       5   // PC26 (and PA29)
 
 // Other constants
-#define L_MICROSTEP        16
-#define R_MICROSTEP        16
-#define MAX_SPEED          24000
-#define ACCELERATION       2000
+#define MICROSTEP			16
+#define ACCELERATION		500
+#define ROTACCELERATION		250
+#define STOPTIME			1000      // Number of milliseconds to hold motor when stopping.  After this time the motor is disabled (and so can freewheel);
 
 class Motors
 {
- protected:
-
-
- public:
+  public:
 	void init();
-	void run();
-	void setAcceleration(float acc);
-	void stop();
+	void loop();
+	void setAcceleration(float acceleration, float rotAcceleration = ROTACCELERATION);
 	void setEnableOutputs(bool);
-
+	void setSpeed(int, int);
+	void stop();
 
 	InterruptStepper* L;
 	InterruptStepper* R;
+
+	/*	void    moveTo(long absolute);
+	void    move(long relative);
+	boolean runSpeed();
+	float   speed();
+	long    distanceToGo();
+	long    targetPosition();
+	long    currentPosition();
+	void    setCurrentPosition(long position);
+	void    runToPosition();
+	boolean runSpeedToPosition();
+	void    runToNewPosition(long position);
+	*/
+
+private:
+	void           computeNewSpeed();
+	void		   setNewSpeed(uint16_t period);
+	float          accelerate(float start, float current, float target, float acceleration);
+
+	long           _currentPos;    // Steps
+	long           _targetPos;     // Steps
+	float          _currentSpeed;  // Steps per second
+	float          _targetSpeed;   // Steps per second
+	float          _currentDirection;  // Steps per second
+	float          _targetDirection;   // Steps per second
+	float          _acceleration;      // Steps per second per second
+	float		   _rotAcceleration;   // Steps per second per second
+	bool		   _stopping;
+	unsigned long  _stopMillis;
+
+	// Variables for acceleration calculation
+	float		   _startSpeed;
+	float		   _startDirection;
+	unsigned long  _startMillis;
 
 };
 
 extern Motors motors;
 extern volatile unsigned long mLCount; 
 extern volatile unsigned long mRCount;  
-
 
 #endif
 
