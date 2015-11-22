@@ -26,6 +26,8 @@
 */
 
 
+#include "ThreePointTurn.h"
+#include "Config.h"
 #include <Servo.h>
 #include <SPI.h>
 
@@ -127,6 +129,15 @@ void set_mode(char modechar)
 	case 'T':
 		mode = &testmode;
 		break;
+
+	case 'C':
+		mode = &config;
+		break;
+
+	case '3':
+		mode = &threePointTurn;
+		break;
+
 
 	}
 	mode->start();

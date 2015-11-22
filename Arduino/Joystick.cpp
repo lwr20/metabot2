@@ -30,12 +30,10 @@ void Joystick::loop()
 	int secs = millis() / 1000;
 	if (secs != last_secs)
 	{
-		noInterrupts();
-		unsigned long mLC = mLCount;
-		mLCount = 0;
-		unsigned long mRC = mRCount;
-		mRCount = 0;
-		interrupts();
+		uint32_t mLC = motors.currentPositionL();
+		uint32_t mRC = motors.currentPositionR();
+		motors.setCurrentPosition(0, 0);
+
 		last_secs = secs;
 		SerialUSB.print(mLC);
 		SerialUSB.print(" (");
