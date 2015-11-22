@@ -26,6 +26,7 @@
 */
 
 
+#include "SpeedTest.h"
 #include "Lights.h"
 #include "Proximity.h"
 #include "ThreePointTurn.h"
@@ -127,7 +128,7 @@ void set_mode(char modechar)
 		mode = &lineFollower;
 		break;
 
-	case 'S':
+	case 'B':
 		mode = &skittles;
 		break;
 
@@ -146,6 +147,11 @@ void set_mode(char modechar)
 	case 'P':
 		mode = &proximity;
 		break;
+
+	case 'S':
+		mode = &speedTest;
+		break;
+
 
 	}
 	mode->start();
