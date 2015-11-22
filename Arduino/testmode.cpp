@@ -11,6 +11,12 @@
 void Testmode::start()
 {
 	SerialUSB.println("Start Test Mode");
+	motors.setCurrentPosition(0, 0);
+	motors.setAcceleration(100, 20);
+	m_currentSpeed = 0;
+	m_currentDirection = 0;
+	m_running = false;
+
 }
 
 void Testmode::stop()
@@ -33,12 +39,14 @@ void Testmode::cmd(int arg_cnt, char **args)
 		// Dead Man's Handle
 		if (args[1][0] == '1')
 		{
-			motors.setSpeed(0.0, CONFIGSPEED);
+			motors.setSpeed(m_currentSpeed, m_currentDirection);
 			motors.setEnableOutputs(true);
+			m_running = true;
 		}
 		else
 		{
 			motors.stop();
+			m_running = false;
 		}
 		break;
 

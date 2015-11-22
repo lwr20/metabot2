@@ -20,6 +20,9 @@ class Testmode : public ModeBase
 	void cmd(int arg_cnt, char **args);
 
 private:
+	uint32_t	m_currentSpeed;
+	uint32_t	m_currentDirection;
+	bool m_running;
 
 };
 

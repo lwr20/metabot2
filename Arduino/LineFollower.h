@@ -10,11 +10,9 @@
 #endif
 
 #include "modebase.h"
+#include "Lights.h"
 
-#define LFENABLEPIN  33 
 #define LFSPEED 60.0
-#define BARLEN 110
-#define NOPINS 5
 #define INACTIVETHRESH 800
 #define STEADYTIME 1000
 #define ERRORMARGIN 5

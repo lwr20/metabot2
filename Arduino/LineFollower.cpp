@@ -17,7 +17,7 @@
 #include "CmdUSB.h"
 #include "Motors.h"
 
-int analogpins[NOPINS] = { 4, 3, 2, 1, 0 };    // pin numbers of the line follower analog inputs, in order
+extern int analogpins[NOPINS];
 
 void LineFollower::start()
 {
