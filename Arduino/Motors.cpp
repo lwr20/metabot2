@@ -7,8 +7,8 @@
 
 #include "Motors.h"
 
-volatile unsigned long mLCount = 0;   // Count of pulses to left motor, Global variable as used in interrupt routine
-volatile unsigned long mRCount = 0;   // Count of pulses to right motor
+volatile uint32_t mLCount = 0;   // Count of pulses to left motor, Global variable as used in interrupt routine
+volatile uint32_t mRCount = 0;   // Count of pulses to right motor
 uint32_t mLChannel = g_APinDescription[X_STEP_PIN].ulPWMChannel;    // Left motor PWM channel
 uint32_t mLChMask = 0x01 << mLChannel;
 uint32_t mRChannel = g_APinDescription[Y_STEP_PIN].ulPWMChannel;    // Right motor PWM channel
@@ -24,6 +24,7 @@ void PWM_Handler()
 		mLCount++;
 	else if ((events & mRChMask) == mRChMask)
 		mRCount++;
+
 }
 
 void Motors::init()
@@ -41,6 +42,10 @@ void Motors::init()
 	L->setEnableOutputs(false);
 	R->setEnableOutputs(false);
 
+	// Reset stop targets (0 means ignore)
+	_targetL = 0;
+	_targetR = 0;
+
 	setAcceleration(ACCELERATION, ROTACCELERATION);
 
 	stop();
@@ -49,6 +54,31 @@ void Motors::init()
 
 void Motors::loop()
 {
+	// Check if we have a target position configured
+	if ((_targetL > 0) || (_targetR > 0))
+	{
+		uint32_t LCount = currentPositionL();
+		uint32_t RCount = currentPositionR();
+		// Check if we have reached our target position, if so, stop.
+		if (atTargetPosition())
+			stop();
+		else
+		{
+			// Check if we are within stopping distance of our target position
+			// If so decelerate towards the STOPPINGSPEED.  Don't go to zero
+			// in case that leaves us short of the target position.
+			uint32_t stopdistance = stoppingDistance();
+			if (((_targetL - LCount) < stopdistance) ||
+				((_targetR - RCount) < stopdistance))
+			{
+				// Work out what the target speed and direction should be
+				int stopSpeed = copysign(min(abs(_currentSpeed), STOPPINGSPEED), _currentSpeed);
+				int stopDir = copysign(min(abs(_currentDirection), STOPPINGSPEED), _currentDirection);
+				setSpeed(stopSpeed, stopDir);
+			}
+		}
+	}
+
 	if (_stopping)
 	{
 		if (_stopMillis + STOPTIME < millis())
@@ -144,7 +174,6 @@ float Motors::accelerate(float start, float current, float target, float acceler
 	return retspeed;
 }
 
-
 void Motors::computeNewSpeed()
 {
 	_currentSpeed = accelerate(_startSpeed, _currentSpeed, _targetSpeed, _acceleration);
@@ -153,6 +182,67 @@ void Motors::computeNewSpeed()
 	L->setSpeed(_currentSpeed + _currentDirection);
 	R->setSpeed(_currentSpeed - _currentDirection);
 }
+
+uint32_t Motors::stoppingDistance()
+{
+	int stopDistance = 0;
+
+	if (abs(_currentSpeed) > STOPPINGSPEED)
+		stopDistance += MICROSTEP * ((_currentSpeed * _currentSpeed) - (STOPPINGSPEED * STOPPINGSPEED))
+							/ (2 * _acceleration);
+
+	if (abs(_currentDirection) > STOPPINGSPEED)
+		stopDistance += MICROSTEP * ((_currentDirection * _currentDirection) - (STOPPINGSPEED * STOPPINGSPEED))
+							/ (2 * _rotAcceleration);
+
+	return stopDistance;
+}
+
+void Motors::moveTo(int lstop, int rstop)
+{
+	_targetL = lstop;
+	_targetR = rstop;
+}
+
+void Motors::move(int lstop, int rstop)
+{
+	_targetL = mLCount + lstop;
+	_targetR = mRCount + rstop;
+}
+
+void Motors::move(int lrstop)
+{
+	move(lrstop, lrstop);
+}
+
+uint32_t Motors::currentPositionL()
+{
+	return mLCount;
+}
+
+uint32_t Motors::currentPositionR()
+{
+	return mRCount;
+}
+
+void Motors::setCurrentPosition(uint32_t positionL, uint32_t positionR)
+{
+	mLCount = positionL;
+	mRCount = positionR;
+}
+
+bool Motors::atTargetPosition()
+{
+	return ((_targetL > 0) && (_targetL <= mLCount)) ||
+		((_targetR > 0) && (_targetR <= mRCount));
+}
+
+bool Motors::isStopped()
+{
+	return (_currentDirection == 0.0) && (_currentSpeed == 0.0);
+}
+
+
 
 Motors motors;
 

@@ -26,6 +26,7 @@
 #define ACCELERATION		500
 #define ROTACCELERATION		250
 #define STOPTIME			1000      // Number of milliseconds to hold motor when stopping.  After this time the motor is disabled (and so can freewheel);
+#define STOPPINGSPEED		3         // Target speed when coming to an automatice stop
 
 class Motors
 {
@@ -36,12 +37,19 @@ class Motors
 	void setEnableOutputs(bool);
 	void setSpeed(int, int);
 	void stop();
+	void moveTo(int, int);
+	void move(int, int);
+	void move(int);
+	uint32_t currentPositionL();
+	uint32_t currentPositionR();
+	void setCurrentPosition(uint32_t positionL, uint32_t positionR);
+	bool isStopped();
+	bool atTargetPosition();
 
 	InterruptStepper* L;
 	InterruptStepper* R;
 
-	/*	void    moveTo(long absolute);
-	void    move(long relative);
+	/*
 	boolean runSpeed();
 	float   speed();
 	long    distanceToGo();
@@ -54,31 +62,30 @@ class Motors
 	*/
 
 private:
-	void           computeNewSpeed();
-	void		   setNewSpeed(uint16_t period);
-	float          accelerate(float start, float current, float target, float acceleration);
+	void        computeNewSpeed();
+	void		setNewSpeed(uint16_t period);
+	float       accelerate(float start, float current, float target, float acceleration);
+	uint32_t	stoppingDistance();
 
-	long           _currentPos;    // Steps
-	long           _targetPos;     // Steps
-	float          _currentSpeed;  // Steps per second
-	float          _targetSpeed;   // Steps per second
-	float          _currentDirection;  // Steps per second
-	float          _targetDirection;   // Steps per second
-	float          _acceleration;      // Steps per second per second
-	float		   _rotAcceleration;   // Steps per second per second
-	bool		   _stopping;
-	unsigned long  _stopMillis;
+	uint32_t	_targetL;			// PWM Pulses (interrupt count)
+	uint32_t	_targetR;			// PWM Pulses (interrupt count)
+	float       _currentSpeed;		// Steps per second
+	float       _targetSpeed;		// Steps per second
+	float       _currentDirection;  // Steps per second
+	float       _targetDirection;   // Steps per second
+	float       _acceleration;      // Steps per second per second
+	float		_rotAcceleration;   // Steps per second per second
+	bool		_stopping;
+	uint32_t    _stopMillis;
 
 	// Variables for acceleration calculation
-	float		   _startSpeed;
-	float		   _startDirection;
-	unsigned long  _startMillis;
+	float		_startSpeed;
+	float		_startDirection;
+	uint32_t    _startMillis;
 
 };
 
 extern Motors motors;
-extern volatile unsigned long mLCount; 
-extern volatile unsigned long mRCount;  
 
 #endif
 

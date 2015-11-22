@@ -1,7 +1,7 @@
-// testmode.h
+// ThreePointTurn.h
 
-#ifndef _TESTMODE_h
-#define _TESTMODE_h
+#ifndef _THREEPOINTTURN_h
+#define _THREEPOINTTURN_h
 
 #if defined(ARDUINO) && ARDUINO >= 100
 	#include "arduino.h"
@@ -11,22 +11,26 @@
 
 #include "modebase.h"
 
-class Testmode : public ModeBase
+class ThreePointTurn : public ModeBase
 {
- public:
+
+public:
 	void start();
 	void stop();
 	void loop();
 	void cmd(int arg_cnt, char **args);
 
 private:
+	void startStep(int);
+
+	int m_step;
 	uint32_t	m_currentSpeed;
 	uint32_t	m_currentDirection;
 	bool m_running;
 
 };
 
-extern Testmode testmode;
+extern ThreePointTurn threePointTurn;
 
 #endif
 

@@ -53,6 +53,7 @@ class MPU9250Class
 	void init();
 	void loop();
 
+	void setMagBias(float mxb, float myb, float mzb);
 	bool readMagData(int16_t * destination);
 
  private:
@@ -61,9 +62,9 @@ class MPU9250Class
 	 void initMPU9250();
 	 void calibrateMPU9250(float * dest1, float * dest2);
 	 void MPU9250SelfTest(float * destination);
-	 void getMres();
-	 void getGres();
-	 void getAres();
+	 float getMres();
+	 float getGres();
+	 float getAres();
 	 void readAccelData(int16_t * destination);
 	 void readGyroData(int16_t * destination);
 	 int16_t readTempData();

@@ -90,7 +90,7 @@ void MPU9250Class::initvars()
 	Gscale = GFS_250DPS;
 	Ascale = AFS_2G;
 	Mscale = MFS_16BITS;
-	Mmode = 0x02;
+	Mmode = 0x06;
 
 	for (i = 0; i < 3; i++)
 	{
@@ -121,6 +121,10 @@ void MPU9250Class::initvars()
 	q[0] = 1.0f;
 	for (i = 1; i < 4; i++)
 		q[i] = 0.0f;
+
+	aRes = getAres();
+	gRes = getGres();
+	mRes = getMres();
 }
 
 void MPU9250Class::loop()
@@ -128,7 +132,6 @@ void MPU9250Class::loop()
 	// If intPin goes high, all data registers have new data
 	if (readByte(INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
 		readAccelData(accelCount);  // Read the x/y/z adc values
-		getAres();
 
 		// Now we'll calculate the accleration value into actual g's
 		ax = (float)accelCount[0] * aRes; // - accelBias[0];  // get actual g value, this depends on scale being set
@@ -136,7 +139,6 @@ void MPU9250Class::loop()
 		az = (float)accelCount[2] * aRes; // - accelBias[2];
 
 		readGyroData(gyroCount);  // Read the x/y/z adc values
-		getGres();
 
 		// Calculate the gyro value into actual degrees per second
 		gx = (float)gyroCount[0] * gRes;  // get actual gyro value, this depends on scale being set
@@ -144,13 +146,12 @@ void MPU9250Class::loop()
 		gz = (float)gyroCount[2] * gRes;
 
 		readMagData(magCount);  // Read the x/y/z adc values
-		getMres();
 
 		// Calculate the magnetometer values in milliGauss
 		// Include factory calibration per data sheet and user environmental corrections
-		mx = (float)magCount[0] * mRes*magCalibration[0] - magbias[0];  // get actual magnetometer value, this depends on scale being set
-		my = (float)magCount[1] * mRes*magCalibration[1] - magbias[1];
-		mz = (float)magCount[2] * mRes*magCalibration[2] - magbias[2];
+		mx = magCount[0];  // get actual magnetometer value, this depends on scale being set
+		my = magCount[1];
+		mz = magCount[2];
 	}
 
 	Now = micros();
@@ -170,125 +171,98 @@ void MPU9250Class::loop()
 	//MadgwickQuaternionUpdate(ax, ay, az, gx*PI/180.0f, gy*PI/180.0f, gz*PI/180.0f,  my,  mx, mz);
 	MahonyQuaternionUpdate(ax, ay, az, gx*PI / 180.0f, gy*PI / 180.0f, gz*PI / 180.0f, my, mx, mz);
 
+	// Serial print and/or display at 0.5 s rate independent of data rates
+	delt_t = millis() - count;
+	if (delt_t > 500) { // update LCD once per half-second independent of read rate
 
-	if (!AHRS) {
-		delt_t = millis() - count;
-		if (delt_t > 500) {
-			if (SerialDebug) {
+		if (SerialDebug) {
+			SerialUSB.print("ax = "); SerialUSB.print((int)1000 * ax);
+			SerialUSB.print(" ay = "); SerialUSB.print((int)1000 * ay);
+			SerialUSB.print(" az = "); SerialUSB.print((int)1000 * az); SerialUSB.println(" mg");
+			SerialUSB.print("gx = "); SerialUSB.print(gx, 2);
+			SerialUSB.print(" gy = "); SerialUSB.print(gy, 2);
+			SerialUSB.print(" gz = "); SerialUSB.print(gz, 2); SerialUSB.println(" deg/s");
+			SerialUSB.print("mx = "); SerialUSB.print((int)mx);
+			SerialUSB.print(" my = "); SerialUSB.print((int)my);
+			SerialUSB.print(" mz = "); SerialUSB.print((int)mz); SerialUSB.println(" mG");
 
-				// Print acceleration values in milligs
-				SerialUSB.print("X-acceleration: "); SerialUSB.print(1000 * ax); SerialUSB.print(" mg ");
-				SerialUSB.print("Y-acceleration: "); SerialUSB.print(1000 * ay); SerialUSB.print(" mg ");
-				SerialUSB.print("Z-acceleration: "); SerialUSB.print(1000 * az); SerialUSB.println(" mg ");
-
-				// Print gyro values in degree/sec
-				SerialUSB.print("X-gyro rate: "); SerialUSB.print(gx, 3); SerialUSB.print(" degrees/sec ");
-				SerialUSB.print("Y-gyro rate: "); SerialUSB.print(gy, 3); SerialUSB.print(" degrees/sec ");
-				SerialUSB.print("Z-gyro rate: "); SerialUSB.print(gz, 3); SerialUSB.println(" degrees/sec");
-
-				// Print mag values in degree/sec
-				SerialUSB.print("X-mag field: "); SerialUSB.print(mx); SerialUSB.print(" mG ");
-				SerialUSB.print("Y-mag field: "); SerialUSB.print(my); SerialUSB.print(" mG ");
-				SerialUSB.print("Z-mag field: "); SerialUSB.print(mz); SerialUSB.println(" mG");
-
-				tempCount = readTempData();  // Read the adc values
-				temperature = ((float)tempCount) / 333.87 + 21.0; // Temperature in degrees Centigrade
-				// Print temperature in degrees Centigrade
-				SerialUSB.print("Temperature is ");  SerialUSB.print(temperature, 1);  SerialUSB.println(" degrees C"); // Print T values to tenths of s degree C
-			}
-			count = millis();
+			SerialUSB.print("q0 = "); SerialUSB.print(q[0]);
+			SerialUSB.print(" qx = "); SerialUSB.print(q[1]);
+			SerialUSB.print(" qy = "); SerialUSB.print(q[2]);
+			SerialUSB.print(" qz = "); SerialUSB.println(q[3]);
 		}
-	}
-	else {
 
-		// Serial print and/or display at 0.5 s rate independent of data rates
-		delt_t = millis() - count;
-		if (delt_t > 500) { // update LCD once per half-second independent of read rate
+		// Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
+		// In this coordinate system, the positive z-axis is down toward Earth.
+		// Yaw is the angle between Sensor x-axis and Earth magnetic North (or true North if corrected for local declination, looking down on the sensor positive yaw is counterclockwise.
+		// Pitch is angle between sensor x-axis and Earth ground plane, toward the Earth is positive, up toward the sky is negative.
+		// Roll is angle between sensor y-axis and Earth ground plane, y-axis up is positive roll.
+		// These arise from the definition of the homogeneous rotation matrix constructed from quaternions.
+		// Tait-Bryan angles as well as Euler angles are non-commutative; that is, the get the correct orientation the rotations must be
+		// applied in the correct order which for this configuration is yaw, pitch, and then roll.
+		// For more see http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles which has additional links.
+		yaw = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3]);
+		pitch = -asin(2.0f * (q[1] * q[3] - q[0] * q[2]));
+		roll = atan2(2.0f * (q[0] * q[1] + q[2] * q[3]), q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3]);
+		pitch *= 180.0f / PI;
+		yaw *= 180.0f / PI;
+		yaw -= 0.75; // Magnetic Declination in Cambridge UK is -0 deg 45' - http://www.magnetic-declination.com/Great%20Britain%20(UK)/Cambridge/897966.html
+		roll *= 180.0f / PI;
 
-			if (SerialDebug) {
-				SerialUSB.print("ax = "); SerialUSB.print((int)1000 * ax);
-				SerialUSB.print(" ay = "); SerialUSB.print((int)1000 * ay);
-				SerialUSB.print(" az = "); SerialUSB.print((int)1000 * az); SerialUSB.println(" mg");
-				SerialUSB.print("gx = "); SerialUSB.print(gx, 2);
-				SerialUSB.print(" gy = "); SerialUSB.print(gy, 2);
-				SerialUSB.print(" gz = "); SerialUSB.print(gz, 2); SerialUSB.println(" deg/s");
-				SerialUSB.print("mx = "); SerialUSB.print((int)mx);
-				SerialUSB.print(" my = "); SerialUSB.print((int)my);
-				SerialUSB.print(" mz = "); SerialUSB.print((int)mz); SerialUSB.println(" mG");
+		if (SerialDebug) {
+			SerialUSB.print("Yaw:  \t"); SerialUSB.println(yaw, 2);
+			SerialUSB.print("Pitch:\t"); SerialUSB.println(pitch, 2);
+			SerialUSB.print("Roll: \t"); SerialUSB.println(roll, 2);
 
-				SerialUSB.print("q0 = "); SerialUSB.print(q[0]);
-				SerialUSB.print(" qx = "); SerialUSB.print(q[1]);
-				SerialUSB.print(" qy = "); SerialUSB.print(q[2]);
-				SerialUSB.print(" qz = "); SerialUSB.println(q[3]);
-			}
-
-			// Define output variables from updated quaternion---these are Tait-Bryan angles, commonly used in aircraft orientation.
-			// In this coordinate system, the positive z-axis is down toward Earth.
-			// Yaw is the angle between Sensor x-axis and Earth magnetic North (or true North if corrected for local declination, looking down on the sensor positive yaw is counterclockwise.
-			// Pitch is angle between sensor x-axis and Earth ground plane, toward the Earth is positive, up toward the sky is negative.
-			// Roll is angle between sensor y-axis and Earth ground plane, y-axis up is positive roll.
-			// These arise from the definition of the homogeneous rotation matrix constructed from quaternions.
-			// Tait-Bryan angles as well as Euler angles are non-commutative; that is, the get the correct orientation the rotations must be
-			// applied in the correct order which for this configuration is yaw, pitch, and then roll.
-			// For more see http://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles which has additional links.
-			yaw = atan2(2.0f * (q[1] * q[2] + q[0] * q[3]), q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3]);
-			pitch = -asin(2.0f * (q[1] * q[3] - q[0] * q[2]));
-			roll = atan2(2.0f * (q[0] * q[1] + q[2] * q[3]), q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3]);
-			pitch *= 180.0f / PI;
-			yaw *= 180.0f / PI;
-			yaw -= 0.75; // Magnetic Declination in Cambridge UK is -0 deg 45' - http://www.magnetic-declination.com/Great%20Britain%20(UK)/Cambridge/897966.html
-			roll *= 180.0f / PI;
-
-			if (SerialDebug) {
-				SerialUSB.print("Yaw:  \t"); SerialUSB.println(yaw, 2);
-				SerialUSB.print("Pitch:\t"); SerialUSB.println(pitch, 2);
-				SerialUSB.print("Roll: \t"); SerialUSB.println(roll, 2);
-
-				SerialUSB.print("rate = "); SerialUSB.print((float)sumCount / sum, 2); SerialUSB.println(" Hz");
-				tilt_compensation(ax, ay, az, mx, my, mz);
-				SerialUSB.print("\x1b[11F");  // Scroll back 11 lines
-			}
-
-			// With these settings the filter is updating at a ~145 Hz rate using the Madgwick scheme and
-			// >200 Hz using the Mahony scheme even though the display refreshes at only 2 Hz.
-			// The filter update rate is determined mostly by the mathematical steps in the respective algorithms,
-			// the processor speed (8 MHz for the 3.3V Pro Mini), and the magnetometer ODR:
-			// an ODR of 10 Hz for the magnetometer produce the above rates, maximum magnetometer ODR of 100 Hz produces
-			// filter update rates of 36 - 145 and ~38 Hz for the Madgwick and Mahony schemes, respectively.
-			// This is presumably because the magnetometer read takes longer than the gyro or accelerometer reads.
-			// This filter update rate should be fast enough to maintain accurate platform orientation for
-			// stabilization control of a fast-moving robot or quadcopter. Compare to the update rate of 200 Hz
-			// produced by the on-board Digital Motion Processor of Invensense's MPU6050 6 DoF and MPU9150 9DoF sensors.
-			// The 3.3 V 8 MHz Pro Mini is doing pretty well!
-
-			count = millis();
-			sumCount = 0;
-			sum = 0;
+			SerialUSB.print("rate = "); SerialUSB.print((float)sumCount / sum, 2); SerialUSB.println(" Hz");
+			tilt_compensation(ax, ay, az, mx, my, mz);
+			tempCount = readTempData();  // Read the adc values
+			temperature = ((float)tempCount) / 333.87 + 21.0; // Temperature in degrees Centigrade
+																// Print temperature in degrees Centigrade
+			SerialUSB.print("Temperature is ");  SerialUSB.print(temperature, 1);  SerialUSB.println(" degrees C"); // Print T values to tenths of s degree C
+			SerialUSB.print("\x1b[12F");  // Scroll back 12 lines
 		}
-	}
 
+		// With these settings the filter is updating at a ~145 Hz rate using the Madgwick scheme and
+		// >200 Hz using the Mahony scheme even though the display refreshes at only 2 Hz.
+		// The filter update rate is determined mostly by the mathematical steps in the respective algorithms,
+		// the processor speed (8 MHz for the 3.3V Pro Mini), and the magnetometer ODR:
+		// an ODR of 10 Hz for the magnetometer produce the above rates, maximum magnetometer ODR of 100 Hz produces
+		// filter update rates of 36 - 145 and ~38 Hz for the Madgwick and Mahony schemes, respectively.
+		// This is presumably because the magnetometer read takes longer than the gyro or accelerometer reads.
+		// This filter update rate should be fast enough to maintain accurate platform orientation for
+		// stabilization control of a fast-moving robot or quadcopter. Compare to the update rate of 200 Hz
+		// produced by the on-board Digital Motion Processor of Invensense's MPU6050 6 DoF and MPU9150 9DoF sensors.
+		// The 3.3 V 8 MHz Pro Mini is doing pretty well!
+
+		count = millis();
+		sumCount = 0;
+		sum = 0;
+	}
 }
 
 //===================================================================================================================
 //====== Set of useful function to access acceleration. gyroscope, magnetometer, and temperature data
 //===================================================================================================================
 
-void MPU9250Class::getMres() 
+void MPU9250Class::setMagBias(float mxb, float myb, float mzb)
 {
-	switch (Mscale)
-	{
-		// Possible magnetometer scales (and their register bit settings) are:
-		// 14 bit resolution (0) and 16 bit resolution (1)
-	case MFS_14BITS:
-		mRes = 10.*4912. / 8190.; // Proper scale to return milliGauss
-		break;
-	case MFS_16BITS:
-		mRes = 10.*4912. / 32760.0; // Proper scale to return milliGauss
-		break;
-	}
+	magbias[0] = mxb;
+	magbias[1] = myb;
+	magbias[2] = mzb;
 }
 
-void MPU9250Class::getGres() 
+float MPU9250Class::getMres() 
+{
+	// Possible magnetometer scales (and their register bit settings) are:
+	// 14 bit resolution (0) and 16 bit resolution (1)
+	if (Mscale == MFS_14BITS)
+		return 10.*4912. / 8190.; // Proper scale to return milliGauss
+	else
+		return 10.*4912. / 32760.0; // Proper scale to return milliGauss
+}
+
+float MPU9250Class::getGres() 
 {
 	switch (Gscale)
 	{
@@ -296,21 +270,22 @@ void MPU9250Class::getGres()
 		// 250 DPS (00), 500 DPS (01), 1000 DPS (10), and 2000 DPS  (11).
 		// Here's a bit of an algorith to calculate DPS/(ADC tick) based on that 2-bit value:
 	case GFS_250DPS:
-		gRes = 250.0 / 32768.0;
+		return 250.0 / 32768.0;
 		break;
 	case GFS_500DPS:
-		gRes = 500.0 / 32768.0;
+		return 500.0 / 32768.0;
 		break;
 	case GFS_1000DPS:
-		gRes = 1000.0 / 32768.0;
+		return 1000.0 / 32768.0;
 		break;
 	case GFS_2000DPS:
-		gRes = 2000.0 / 32768.0;
+		return 2000.0 / 32768.0;
 		break;
 	}
+	return 250.0 / 32768.0;
 }
 
-void MPU9250Class::getAres() 
+float MPU9250Class::getAres() 
 {
 	switch (Ascale)
 	{
@@ -318,20 +293,20 @@ void MPU9250Class::getAres()
 		// 2 Gs (00), 4 Gs (01), 8 Gs (10), and 16 Gs  (11).
 		// Here's a bit of an algorith to calculate DPS/(ADC tick) based on that 2-bit value:
 	case AFS_2G:
-		aRes = 2.0 / 32768.0;
+		return 2.0 / 32768.0;
 		break;
 	case AFS_4G:
-		aRes = 4.0 / 32768.0;
+		return 4.0 / 32768.0;
 		break;
 	case AFS_8G:
-		aRes = 8.0 / 32768.0;
+		return 8.0 / 32768.0;
 		break;
 	case AFS_16G:
-		aRes = 16.0 / 32768.0;
+		return 16.0 / 32768.0;
 		break;
 	}
+	return 2.0 / 32768.0;
 }
-
 
 void MPU9250Class::readAccelData(int16_t * destination)
 {
@@ -339,7 +314,6 @@ void MPU9250Class::readAccelData(int16_t * destination)
 	destination[1] = readWord(ACCEL_YOUT_H);
 	destination[2] = readWord(ACCEL_ZOUT_H);
 }
-
 
 void MPU9250Class::readGyroData(int16_t * destination)
 {
@@ -359,6 +333,11 @@ bool MPU9250Class::readMagData(int16_t * destination)
 			destination[0] = ((int16_t)rawData[1] << 8) | rawData[0];  // Turn the MSB and LSB into a signed 16-bit value
 			destination[1] = ((int16_t)rawData[3] << 8) | rawData[2];  // Data stored as little Endian
 			destination[2] = ((int16_t)rawData[5] << 8) | rawData[4];
+			
+			destination[0] = destination[0] * mRes * magCalibration[0] - magbias[0];
+			destination[1] = destination[1] * mRes * magCalibration[1] - magbias[1];
+			destination[2] = destination[2] * mRes * magCalibration[2] - magbias[2];
+
 			return true;
 		}
 	}
