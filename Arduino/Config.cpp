@@ -118,7 +118,7 @@ void Config::cmd(int arg_cnt, char **args)
 		// Dead Man's Handle
 		if (args[1][0] == '1')
 		{
-			motors.setSpeed(0.0, rotspeed);
+			motors.setSpeedDirection(0.0, rotspeed);
 			motors.setEnableOutputs(true);
 			if (state != stopped)
 				state = running;

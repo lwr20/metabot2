@@ -30,6 +30,9 @@ void Proximity::start()
 void Proximity::stop()
 {
 	SerialUSB.println("Proximity Alert Mode");
+	// Disable lights
+	lights.setEnabled(true);
+	
 }
 
 void Proximity::loop()
@@ -64,7 +67,7 @@ void Proximity::cmd(int arg_cnt, char **args)
 		// Dead Man's Handle
 		if (args[1][0] == '1')
 		{
-			motors.setSpeed(m_currentSpeed, 0);
+			motors.setSpeedDirection(m_currentSpeed, 0);
 			motors.setEnableOutputs(true);
 			motors.moveTo(0,0);  // Cancel effect of move in config mode
 			m_running = true;
@@ -90,7 +93,7 @@ void Proximity::cmd(int arg_cnt, char **args)
 					SerialUSB.println("left, middle, right, left_wheel, right_wheel");
 					motors.setCurrentPosition(0, 0);
 					motors.move(600);
-					motors.setSpeed(-SLOWSPEED, 0);
+					motors.setSpeedDirection(-SLOWSPEED, 0);
 					motors.setEnableOutputs(true);
 				}
 			}
@@ -164,7 +167,7 @@ void Proximity::updateSpeed(int32_t* values)
 	if (diff500 > 0)
 	{
 		m_currentSpeed = HIGHSPEED;
-		motors.setSpeed(m_currentSpeed, 0);
+		motors.setSpeedDirection(m_currentSpeed, 0);
 		return;
 	}
 
@@ -176,7 +179,7 @@ void Proximity::updateSpeed(int32_t* values)
 	}
 
 	m_currentSpeed = SLOWSPEED;
-	motors.setSpeed(m_currentSpeed, 0);
+	motors.setSpeedDirection(m_currentSpeed, 0);
 }
 
 Proximity proximity;

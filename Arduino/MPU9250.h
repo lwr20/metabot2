@@ -55,6 +55,9 @@ class MPU9250Class
 
 	void setMagBias(float mxb, float myb, float mzb);
 	bool readMagData(int16_t * destination);
+	void readAccelData(int16_t * destination);
+	void readGyroData(int16_t * destination);
+	bool isDataReady();
 
  private:
 	 void initAK8963(float * destination);
@@ -65,12 +68,10 @@ class MPU9250Class
 	 float getMres();
 	 float getGres();
 	 float getAres();
-	 void readAccelData(int16_t * destination);
-	 void readGyroData(int16_t * destination);
 	 int16_t readTempData();
 	 void MadgwickQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz);
 	 void MahonyQuaternionUpdate(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz);
-   void tilt_compensation(float ax, float ay, float az, float raw_mx, float raw_my, float raw_mz);
+     void tilt_compensation(float ax, float ay, float az, float raw_mx, float raw_my, float raw_mz);
 
 	uint8_t readByte(uint8_t reg);
 	uint16_t readWord(uint8_t reg);

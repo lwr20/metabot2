@@ -64,7 +64,7 @@ void ThreePointTurn::cmd(int arg_cnt, char **args)
 		// Dead Man's Handle
 		if (args[1][0] == '1')
 		{
-			motors.setSpeed(m_currentSpeed, m_currentDirection);
+			motors.setSpeedDirection(m_currentSpeed, m_currentDirection);
 			motors.setEnableOutputs(true);
 			m_running = true;
 		}
@@ -116,7 +116,7 @@ void ThreePointTurn::startStep(int step)
 	SerialUSB.println(sequence[step].distance);
 	motors.move(sequence[step].distance);
 	if (m_running)
-		motors.setSpeed(m_currentSpeed, m_currentDirection);
+		motors.setSpeedDirection(m_currentSpeed, m_currentDirection);
 
 }
 

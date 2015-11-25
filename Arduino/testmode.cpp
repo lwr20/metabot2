@@ -26,6 +26,19 @@ void Testmode::stop()
 
 void Testmode::loop()
 {
+	static int last_time = 0;
+	int time = millis() / 500;
+	int16_t accelCount[3];
+
+	if (time != last_time && MPU9250.isDataReady())
+	{
+		last_time = time;
+		MPU9250.readAccelData(accelCount);
+		int ax = accelCount[0];
+		int ay = accelCount[1]; 
+		int az = accelCount[2];
+		SerialUSB.print(ax); SerialUSB.print(", "); SerialUSB.print(ay); SerialUSB.print(", "); SerialUSB.println(az);
+	}
 }
 
 void Testmode::cmd(int arg_cnt, char **args)
@@ -39,7 +52,7 @@ void Testmode::cmd(int arg_cnt, char **args)
 		// Dead Man's Handle
 		if (args[1][0] == '1')
 		{
-			motors.setSpeed(m_currentSpeed, m_currentDirection);
+			motors.setSpeedDirection(m_currentSpeed, m_currentDirection);
 			motors.setEnableOutputs(true);
 			m_running = true;
 		}

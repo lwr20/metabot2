@@ -46,7 +46,7 @@ void Motors::init()
 	_targetL = 0;
 	_targetR = 0;
 
-	setAcceleration(ACCELERATION, ROTACCELERATION);
+	setAcceleration(DFLTACCELERATION, DFLTROTACCELERATION);
 
 	stop();
 
@@ -74,7 +74,8 @@ void Motors::loop()
 				// Work out what the target speed and direction should be
 				int stopSpeed = copysign(min(abs(_currentSpeed), STOPPINGSPEED), _currentSpeed);
 				int stopDir = copysign(min(abs(_currentDirection), STOPPINGSPEED), _currentDirection);
-				setSpeed(stopSpeed, stopDir);
+				setSpeed(stopSpeed);
+				setDirection(stopDir);
 			}
 		}
 	}
@@ -98,9 +99,25 @@ void Motors::setEnableOutputs(bool enable)
 	R->setEnableOutputs(enable);
 }
 
+float Motors::currentSpeed()
+{
+	return _currentSpeed;
+}
+
+float Motors::currentDirection()
+{
+	return _currentDirection;
+}
+
+
+void Motors::setAcceleration(float acceleration)
+{
+	setAcceleration(acceleration, _rotAcceleration);
+}
+
 void Motors::setAcceleration(float acceleration, float rotAcceleration)
 {
-	if (acceleration < 0)
+	if (acceleration < 0 || rotAcceleration < 0)
 		return;
 
 	_acceleration = acceleration;
@@ -135,7 +152,7 @@ void Motors::stop()
   at the same time, then the larger change is constrained by the
   acceleration and the smaller change changes proportionally.
   */
-void Motors::setSpeed(int speed, int direction)
+void Motors::setSpeedDirection(int speed, int direction)
 {
 	// Reset speed calculation
 	_startSpeed = _currentSpeed;
@@ -146,6 +163,18 @@ void Motors::setSpeed(int speed, int direction)
 	_stopping = false;
 
 	computeNewSpeed();
+}
+
+void Motors::setSpeed(int speed)
+{
+	if (speed != _targetSpeed)
+		setSpeedDirection(speed, _targetDirection);
+}
+
+void Motors::setDirection(int direction)
+{
+	if (direction != _targetDirection)
+		setSpeedDirection(_targetSpeed, direction);
 }
 
 float Motors::accelerate(float start, float current, float target, float acceleration)
