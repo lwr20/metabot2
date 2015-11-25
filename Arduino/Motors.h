@@ -23,19 +23,21 @@
 
 // Other constants
 #define MICROSTEP			16
-#define ACCELERATION		500
-#define ROTACCELERATION		250
 #define STOPTIME			1000      // Number of milliseconds to hold motor when stopping.  After this time the motor is disabled (and so can freewheel);
 #define STOPPINGSPEED		3         // Target speed when coming to an automatice stop
-
+#define DFLTACCELERATION	1000
+#define DFLTROTACCELERATION	1000
 class Motors
 {
   public:
 	void init();
 	void loop();
-	void setAcceleration(float acceleration, float rotAcceleration = ROTACCELERATION);
+	void setAcceleration(float acceleration, float rotAcceleration);
+	void setAcceleration(float acceleration);
 	void setEnableOutputs(bool);
-	void setSpeed(int, int);
+	void setSpeedDirection(int,int);
+	void setSpeed(int);
+	void setDirection(int);
 	void stop();
 	void moveTo(int, int);
 	void move(int, int);
@@ -45,6 +47,8 @@ class Motors
 	void setCurrentPosition(uint32_t positionL, uint32_t positionR);
 	bool isStopped();
 	bool atTargetPosition();
+	float currentSpeed();
+	float currentDirection();
 
 	InterruptStepper* L;
 	InterruptStepper* R;

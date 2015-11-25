@@ -11,6 +11,10 @@
 
 #include "modebase.h"
 
+#define JOYACCELERATION			1000
+#define JOYROTACCELERATION		1000
+
+
 class Joystick : public ModeBase
 {
 

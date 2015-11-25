@@ -130,20 +130,20 @@ void MPU9250Class::initvars()
 void MPU9250Class::loop()
 {
 	// If intPin goes high, all data registers have new data
-	if (readByte(INT_STATUS) & 0x01) {  // On interrupt, check if data ready interrupt
+	if (isDataReady()) {  // On interrupt, check if data ready interrupt
 		readAccelData(accelCount);  // Read the x/y/z adc values
 
 		// Now we'll calculate the accleration value into actual g's
-		ax = (float)accelCount[0] * aRes; // - accelBias[0];  // get actual g value, this depends on scale being set
-		ay = (float)accelCount[1] * aRes; // - accelBias[1];
-		az = (float)accelCount[2] * aRes; // - accelBias[2];
+		ax = (float)accelCount[0]; // - accelBias[0];  // get actual g value, this depends on scale being set
+		ay = (float)accelCount[1]; // - accelBias[1];
+		az = (float)accelCount[2]; // - accelBias[2];
 
 		readGyroData(gyroCount);  // Read the x/y/z adc values
 
 		// Calculate the gyro value into actual degrees per second
-		gx = (float)gyroCount[0] * gRes;  // get actual gyro value, this depends on scale being set
-		gy = (float)gyroCount[1] * gRes;
-		gz = (float)gyroCount[2] * gRes;
+		gx = (float)gyroCount[0];  // get actual gyro value, this depends on scale being set
+		gy = (float)gyroCount[1];
+		gz = (float)gyroCount[2];
 
 		readMagData(magCount);  // Read the x/y/z adc values
 
@@ -308,18 +308,23 @@ float MPU9250Class::getAres()
 	return 2.0 / 32768.0;
 }
 
+bool MPU9250Class::isDataReady()
+{
+	return readByte(INT_STATUS) & 0x01;
+}
+
 void MPU9250Class::readAccelData(int16_t * destination)
 {
-	destination[0] = readWord(ACCEL_XOUT_H);
-	destination[1] = readWord(ACCEL_YOUT_H);
-	destination[2] = readWord(ACCEL_ZOUT_H);
+	destination[0] = readWord(ACCEL_XOUT_H) * aRes;
+	destination[1] = readWord(ACCEL_YOUT_H) * aRes;
+	destination[2] = readWord(ACCEL_ZOUT_H) * aRes;
 }
 
 void MPU9250Class::readGyroData(int16_t * destination)
 {
-	destination[0] = readWord(GYRO_XOUT_H);
-	destination[1] = readWord(GYRO_YOUT_H);
-	destination[2] = readWord(GYRO_ZOUT_H);
+	destination[0] = readWord(GYRO_XOUT_H) * gRes;
+	destination[1] = readWord(GYRO_YOUT_H) * gRes;
+	destination[2] = readWord(GYRO_ZOUT_H) * gRes;
 }
 
 bool MPU9250Class::readMagData(int16_t * destination)

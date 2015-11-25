@@ -13,7 +13,7 @@ void Joystick::start()
 {
 	SerialUSB.println("Start Joystick Mode");
 	motors.stop();
-	motors.setAcceleration(ACCELERATION);
+	motors.setAcceleration(JOYACCELERATION, JOYROTACCELERATION);
 }
 
 void Joystick::stop()
@@ -92,9 +92,9 @@ void Joystick::setForward(int arg_cnt, char **args) {
 			return;
 		
 		if (_normdir)
-			motors.setSpeed(speed, direction);
+			motors.setSpeedDirection(speed, direction);
 		else
-			motors.setSpeed(-speed, -direction);
+			motors.setSpeedDirection(-speed, -direction);
 
 		motors.setEnableOutputs(true);
 	}

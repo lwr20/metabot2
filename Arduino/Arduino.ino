@@ -26,6 +26,7 @@
 */
 
 
+#include "SpeedTest.h"
 #include "Lights.h"
 #include "Proximity.h"
 #include "ThreePointTurn.h"
@@ -127,7 +128,7 @@ void set_mode(char modechar)
 		mode = &lineFollower;
 		break;
 
-	case 'S':
+	case 'B':
 		mode = &skittles;
 		break;
 
@@ -147,6 +148,11 @@ void set_mode(char modechar)
 		mode = &proximity;
 		break;
 
+	case 'S':
+		mode = &speedTest;
+		break;
+
+
 	}
 	mode->start();
 }
@@ -157,10 +163,21 @@ void setAcceleration(int arg_cnt, char **args)
 	if (arg_cnt > 1)
 	{
 		int acc = cmdStr2Num(args[1], 10);
-		motors.setAcceleration(float(acc));
-
-		SerialUSB.print("A : ");
-		SerialUSB.println(args[1]);
+		if (arg_cnt > 1)
+		{
+			int racc = cmdStr2Num(args[2], 10);
+			motors.setAcceleration(float(acc), float(racc));
+			SerialUSB.print("A : ");
+			SerialUSB.print(acc);
+			SerialUSB.print(", ");
+			SerialUSB.println(racc);
+		}
+		else
+		{
+			motors.setAcceleration(float(acc));
+			SerialUSB.print("A : ");
+			SerialUSB.println(acc);
+		}
 	}
 }
 
