@@ -23,7 +23,8 @@ public:
 	void stop();
 	void loop();
 	void cmd(int arg_cnt, char **args);
-
+	void setdmh(bool setting);
+		
 private:
 	void calcAverages(int position, int32_t* values);
 	void updateSpeed(int32_t* values);

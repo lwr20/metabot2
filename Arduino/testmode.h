@@ -18,6 +18,7 @@ class Testmode : public ModeBase
 	void stop();
 	void loop();
 	void cmd(int arg_cnt, char **args);
+	void setdmh(bool);
 
 private:
 	uint32_t	m_currentSpeed;

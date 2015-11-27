@@ -54,6 +54,10 @@ void Joystick::cmd(int arg_cnt, char **args)
 		setForward(arg_cnt, args);
 }
 
+void Joystick::setdmh(bool setting)
+{
+}
+
 void Joystick::setDirection(bool direction)
 {
 	_normdir = direction;

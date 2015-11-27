@@ -195,11 +195,6 @@ void LineFollower::cmd(int arg_cnt, char **args)
 
 	switch (cmd)
 	{
-	case 'D':
-		// Dead Man's Handle
-		dmhcmd(arg_cnt, args);
-		break;
-
 	case 'P':
 		// Set Speed
 		speedcmd(arg_cnt, args);
@@ -207,22 +202,17 @@ void LineFollower::cmd(int arg_cnt, char **args)
 	}
 }
 
-void LineFollower::dmhcmd(int arg_cnt, char **args)
+void LineFollower::setdmh(bool dmhset)
 {
-	if (arg_cnt < 2)
-		return;
-
-	dmh = (args[1][0] == '1');
-
-	if (!dmh)
-	{
-		motors.stop();
-	}
-	else
+	if (dmhset)
 	{
 		motors.setEnableOutputs(true);
 		if (state == config)
 			state = active;
+	}
+	else
+	{
+		motors.stop();
 	}
 }
 

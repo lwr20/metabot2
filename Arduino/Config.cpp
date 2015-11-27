@@ -109,31 +109,24 @@ void Config::loop()
 
 void Config::cmd(int arg_cnt, char **args)
 {
-	// Check for Dead Man's Handle
-	char cmd = args[0][0];
-
-	switch (cmd)
-	{
-	case 'D':
-		// Dead Man's Handle
-		if (args[1][0] == '1')
-		{
-			motors.setSpeedDirection(0.0, rotspeed);
-			motors.setEnableOutputs(true);
-			if (state != stopped)
-				state = running;
-		}
-		else
-		{
-			motors.stop();
-			if (state != stopped)
-				state = paused;
-		}
-		break;
-
-	}
 }
 
+void Config::setdmh(bool dmhset)
+{
+	if (dmhset)
+	{
+		motors.setSpeedDirection(0.0, rotspeed);
+		motors.setEnableOutputs(true);
+		if (state != stopped)
+			state = running;
+	}
+	else
+	{
+		motors.stop();
+		if (state != stopped)
+			state = paused;
+	}
+}
 
 Config config;
 

@@ -80,34 +80,27 @@ void SpeedTest::loop()
 
 void SpeedTest::cmd(int arg_cnt, char **args)
 {
-	// Check for Dead Man's Handle
-	char cmd = args[0][0];
-
-	switch (cmd)
-	{
-	case 'D':
-		// Dead Man's Handle
-		if (args[1][0] == '1')
-		{
-			motors.setAcceleration(accelrate[0]);
-			motors.setSpeedDirection(MAXSPEED,0);
-			motors.setEnableOutputs(true);
-			m_running = true;
-		}
-		else
-		{
-			int speed = motors.currentSpeed();
-			SerialUSB.print("Stopping at speed : ");
-			SerialUSB.println(speed);
-			motors.stop();
-			m_running = false;
-			m_accelindex = 0;
-		}
-		break;
-
-	}
 }
 
+void SpeedTest::setdmh(bool setting)
+{
+	if (setting)
+	{
+		motors.setAcceleration(accelrate[0]);
+		motors.setSpeedDirection(MAXSPEED, 0);
+		motors.setEnableOutputs(true);
+		m_running = true;
+	}
+	else
+	{
+		int speed = motors.currentSpeed();
+		SerialUSB.print("Stopping at speed : ");
+		SerialUSB.println(speed);
+		motors.stop();
+		m_running = false;
+		m_accelindex = 0;
+	}
+}
 
 
 

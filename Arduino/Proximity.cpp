@@ -63,23 +63,6 @@ void Proximity::cmd(int arg_cnt, char **args)
 
 	switch (cmd)
 	{
-	case 'D':
-		// Dead Man's Handle
-		if (args[1][0] == '1')
-		{
-			motors.setSpeedDirection(m_currentSpeed, 0);
-			motors.setEnableOutputs(true);
-			motors.moveTo(0,0);  // Cancel effect of move in config mode
-			m_running = true;
-			m_config = false;
-		}
-		else
-		{
-			motors.stop();
-			m_running = false;
-		}
-		break;
-
 	case 'F':
 
 		if (arg_cnt >= 2)
@@ -98,6 +81,23 @@ void Proximity::cmd(int arg_cnt, char **args)
 				}
 			}
 		}
+	}
+}
+
+void Proximity::setdmh(bool setting)
+{
+	if (setting)
+	{
+		motors.setSpeedDirection(m_currentSpeed, 0);
+		motors.setEnableOutputs(true);
+		//motors.moveTo(0,0);  // Cancel effect of move in config mode
+		m_running = true;
+		m_config = false;
+	}
+	else
+	{
+		motors.stop();
+		m_running = false;
 	}
 }
 

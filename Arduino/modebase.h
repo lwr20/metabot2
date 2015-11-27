@@ -16,6 +16,7 @@ class ModeBase
 	virtual void stop();
 	virtual void loop();
 	virtual void cmd(int arg_cnt, char **args);
+	virtual void setdmh(bool);
 };
 
 #endif

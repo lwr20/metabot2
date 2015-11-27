@@ -61,7 +61,10 @@ void Motors::loop()
 		uint32_t RCount = currentPositionR();
 		// Check if we have reached our target position, if so, stop.
 		if (atTargetPosition())
+		{
 			stop();
+			resetTargetPosition();
+		}
 		else
 		{
 			// Check if we are within stopping distance of our target position
@@ -258,6 +261,12 @@ void Motors::setCurrentPosition(uint32_t positionL, uint32_t positionR)
 {
 	mLCount = positionL;
 	mRCount = positionR;
+}
+
+void Motors::resetTargetPosition()
+{
+	_targetL = 0;
+	_targetR = 0;
 }
 
 bool Motors::atTargetPosition()

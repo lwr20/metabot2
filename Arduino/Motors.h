@@ -45,6 +45,7 @@ class Motors
 	uint32_t currentPositionL();
 	uint32_t currentPositionR();
 	void setCurrentPosition(uint32_t positionL, uint32_t positionR);
+	void resetTargetPosition();
 	bool isStopped();
 	bool atTargetPosition();
 	float currentSpeed();

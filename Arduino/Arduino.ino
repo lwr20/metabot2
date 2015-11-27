@@ -105,6 +105,12 @@ void process_cmd(int arg_cnt, char **args)
 		setAcceleration(arg_cnt, args);
 		break;
 
+	case 'D':
+		// Dead Man's Handle
+		if (arg_cnt > 1)
+			mode->setdmh(args[1][0] == '1');
+		break;
+
 		// Add cases for any generic commands not associated with a specific mode
 
 	default:

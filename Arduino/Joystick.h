@@ -23,6 +23,7 @@ class Joystick : public ModeBase
 	void stop();
 	void loop();
 	void cmd(int arg_cnt, char **args);
+	void setdmh(bool setting);
 	void setDirection(bool fwd);
 
   private:

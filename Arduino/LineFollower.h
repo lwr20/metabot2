@@ -25,10 +25,10 @@ class LineFollower : public ModeBase
 	void stop();
 	void loop();
 	void cmd(int arg_cnt, char **args);
+	void setdmh(bool dmhset);
 
   private:
 	bool dmh;				//Dead Man's Handle
-	void dmhcmd(int arg_cnt, char **args);
 	void speedcmd(int arg_cnt, char **args);
 	bool steadyReadings();
 	bool reflection();
