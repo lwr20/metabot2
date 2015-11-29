@@ -11,6 +11,7 @@ void Proximity::start()
 	m_currentSpeed = 0;
 	m_running = false;
 	m_config = false;
+	stoppingdistance = STOPPINGDISTANCE;
 
 	// Assign some default thresholds in case we can't do a config run
 	val70[0] = 864.0;
@@ -75,13 +76,12 @@ void Proximity::loop()
 
 void Proximity::cmd(int arg_cnt, char **args)
 {
-	// Check for Dead Man's Handle
 	char cmd = args[0][0];
 
 	switch (cmd)
 	{
 	case 'F':
-
+		// Look for back joystick for calibration run
 		if (arg_cnt >= 2)
 		{
 			int32_t speed = cmdStr2Num(args[1], 10);
@@ -105,6 +105,17 @@ void Proximity::cmd(int arg_cnt, char **args)
 					motors.stop();
 				}
 			}
+		}
+		break;
+
+	case 'C':
+		// Configure the final stopping distance.
+		// This is how far metabot runs after hitting the val70 point
+		if (arg_cnt >= 2)
+		{
+			stoppingdistance = cmdStr2Num(args[1], 10);
+			SerialUSB.print("Set stopping distance to : ");
+			SerialUSB.println(stoppingdistance);
 		}
 	}
 }
@@ -203,7 +214,7 @@ void Proximity::updateSpeed(int32_t* values)
 		return;
 	}
 
-	motors.move(30);
+	motors.move(stoppingdistance);
 	m_running = false;
 }
 

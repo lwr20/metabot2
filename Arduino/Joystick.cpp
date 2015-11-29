@@ -65,7 +65,7 @@ void Joystick::cmd(int arg_cnt, char **args)
 	{
 		servooff = cmdStr2Num(args[1], 10);
 		servoon = cmdStr2Num(args[2], 10);
-		SerialUSB.print("Set Servo Off, On angle to : ");
+		SerialUSB.print("Set Servo Off & On angle to : ");
 		SerialUSB.print(servooff);
 		SerialUSB.print(", ");
 		SerialUSB.println(servoon);
