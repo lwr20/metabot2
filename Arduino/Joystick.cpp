@@ -17,7 +17,6 @@ void Joystick::start()
 	servooff = SERVOOFF;
 	servo.write(servooff);
 	motors.stop();
-	sensitivity = 100;
 	motors.setAcceleration(JOYACCELERATION, JOYROTACCELERATION);
 }
 
@@ -59,11 +58,17 @@ void Joystick::cmd(int arg_cnt, char **args)
 	if (args[0][0] == 'F')
 		setForward(arg_cnt, args);
 	else if (args[0][0] == 'V' && arg_cnt >= 2)
-		sensitivity = cmdStr2Num(args[1], 10);
+	{
+		setSensitivity(cmdStr2Num(args[1], 10));
+	}
 	else if (args[0][0] == 'C' && arg_cnt >= 3)
 	{
 		servooff = cmdStr2Num(args[1], 10);
-		servoon = cmdStr2Num(args[1], 10);
+		servoon = cmdStr2Num(args[2], 10);
+		SerialUSB.print("Set Servo Off, On angle to : ");
+		SerialUSB.print(servooff);
+		SerialUSB.print(", ");
+		SerialUSB.println(servoon);
 	}
 }
 
@@ -89,6 +94,8 @@ void Joystick::setDirection(bool direction)
 void Joystick::setSensitivity(int s)
 {
 	sensitivity = s;
+	SerialUSB.print("Set sensitivity to ");
+	SerialUSB.println(sensitivity);
 }
 
 void Joystick::setForward(int arg_cnt, char **args) {

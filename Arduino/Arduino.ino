@@ -93,7 +93,7 @@ void process_cmd(int arg_cnt, char **args)
 			set_mode(args[1][0]);
 		break;
 
-	case 'S':
+	case 'X':
 		// Emergency stop
 		motors.stop();
 		SerialUSB.println("Emergency Stop");
@@ -125,7 +125,7 @@ void set_mode(char modechar)
 	{
 	case 'B':
 		mode = &joystick;
-		joystick.setSensitivity(20);
+		joystick.setSensitivity(10);
 		break;
 
 	case 'J':
