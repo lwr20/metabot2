@@ -61,7 +61,21 @@ import getopt
 import logging
 import serial
 import pykka
+import pygame
 import time
+
+from pygame.locals import *
+
+# Set the display to fb1 - i.e. the TFT
+os.environ["SDL_FBDEV"] = "/dev/fb1"
+# Remove mouse
+os.environ["SDL_NOMOUSE"]="1"
+
+# initialise pygame module
+pygame.init()
+
+# set up the window
+screen = pygame.display.set_mode((320, 240), 0, 32)
 
 DEFAULT_HOST = "10.5.5.1"
 logger = logging.getLogger()
@@ -79,6 +93,18 @@ MODES = {"j": "Joystick",
          ":": "Arduino Cmd",
          "?": "Help"}
 
+# dictionary of images to display when entering modes
+IMAGES = {"j": "joystick.png",
+          "r": "reverse.png",
+          "s": "speed.png",
+          "l": "line_follow.png",
+          "3": "3_pt_turn.png",
+          "b": "bowling.png",
+          "p": "proximity.png",
+          "c": "config.png",
+          "t": "test.png",
+          ":": "arduino.png"
+          }
 
 class Controller(threading.Thread):
     def __init__(self, mode):
@@ -308,7 +334,7 @@ class Mode(pykka.ThreadingActor):
                 return -1
             else:
                 return 1
-        speed = y * y * sign(y) * 2000.0      #  Use the squares of x and y to make it non-linear
+        speed = y * y * sign(y) * 2000.0      # Use the squares of x and y to make it non-linear
         direction = x * x * sign(x) * 200.0
         return int(speed), int(direction)
 
@@ -377,9 +403,11 @@ def main(argv):
             elif modecmd == "x":
                 mode.send_cmd("X")
             elif len(modecmd) > 0 and modecmd[0] == ":":
+                display_image(IMAGES[modecmd])
                 mode.send_cmd(modecmd[1:])
             elif modecmd in MODES and modecmd != "q":
                 print("  Entering Mode : {}".format(MODES[modecmd]))
+                display_image(IMAGES[modecmd])
                 mode.mode_update(modecmd)
     except KeyboardInterrupt:
         pass
@@ -391,6 +419,17 @@ def main(argv):
     local_controller.running = False
     pykka.ActorRegistry.stop_all()
     sys.exit()
+
+
+def display_image(filename):
+    """
+    Loads a file and displays it on the screen
+    :param filename: String containing the name of the file to load.
+    """
+    image = pygame.image.load(filename)
+    screen.blit(image, (0, 0))
+    pygame.display.flip()
+    pygame.display.update()
 
 
 if __name__ == "__main__":
