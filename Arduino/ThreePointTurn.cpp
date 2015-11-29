@@ -3,7 +3,7 @@
 
 #define MODESPEED	200
 #define MODEDIR  	40
-#define TURN90COUNT   1300
+#define TURN90COUNT   1350
 
 enum Actions {Forward, Backward, TurnLeft, TurnRight, Stop};
 
@@ -14,13 +14,13 @@ struct Action {
 
 #define STEPS 8
 Action sequence[STEPS]= {
-	{ Forward, 15000 },
+	{ Forward, 15500 },
 	{ TurnLeft, TURN90COUNT },
-	{ Forward, 3500 },
+	{ Forward, 3000 },
 	{ Backward, 7000 },
-	{ Forward, 3500 },
+	{ Forward, 4000 },
 	{ TurnLeft, TURN90COUNT },
-	{ Forward, 13000 },
+	{ Forward, 14000 },
 	{ Stop, 1000 },
 };
 
@@ -30,7 +30,7 @@ void ThreePointTurn::start()
 	SerialUSB.println("Start Three Point Turn Mode");
 
 	motors.setCurrentPosition(0, 0);
-	motors.setAcceleration(100, 20);
+	motors.setAcceleration(100, 50);
 	m_step = 0;
 	m_running = false;
 	SerialUSB.print("Position : "); SerialUSB.print(motors.currentPositionL()); SerialUSB.print(", "); SerialUSB.println(motors.currentPositionR());
@@ -55,26 +55,26 @@ void ThreePointTurn::loop()
 
 void ThreePointTurn::cmd(int arg_cnt, char **args)
 {
-	// Check for Dead Man's Handle
-	char cmd = args[0][0];
+}
 
-	switch (cmd)
+void ThreePointTurn::setdmh(bool dmhset)
+{
+	if (dmhset)
 	{
-	case 'D':
-		// Dead Man's Handle
-		if (args[1][0] == '1')
+		if (sequence[m_step].action == Stop)
 		{
-			motors.setSpeedDirection(m_currentSpeed, m_currentDirection);
-			motors.setEnableOutputs(true);
-			m_running = true;
+			// Reset to the beginning of the sequence
+			m_step = 0;
+			startStep(m_step);
 		}
-		else
-		{
-			motors.stop();
-			m_running = false;
-		}
-		break;
-
+		motors.setSpeedDirection(m_currentSpeed, m_currentDirection);
+		motors.setEnableOutputs(true);
+		m_running = true;
+	}
+	else
+	{
+		motors.stop();
+		m_running = false;
 	}
 }
 

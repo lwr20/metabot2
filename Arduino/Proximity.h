@@ -13,8 +13,10 @@
 #include "Lights.h"
 
 #define HIGHSPEED 200
-#define SLOWSPEED 5
+#define SLOWSPEED 10
 #define SLOWDISTANCE 30
+
+#define STOPPINGDISTANCE 30   // number of clicks to continue after hitting the val70 point (which in theory is 70 clicks from the wall)
 
 class Proximity : public ModeBase
 {
@@ -23,7 +25,8 @@ public:
 	void stop();
 	void loop();
 	void cmd(int arg_cnt, char **args);
-
+	void setdmh(bool setting);
+		
 private:
 	void calcAverages(int position, int32_t* values);
 	void updateSpeed(int32_t* values);
@@ -33,6 +36,7 @@ private:
 	bool m_running;
 	bool m_config;
 	float lastAverage[3];
+	int stoppingdistance;
 	
 	// Average values when 70 and 500 pulses away from the wall
 	float val70[3];

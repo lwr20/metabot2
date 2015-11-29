@@ -18,10 +18,12 @@ public:
 	void stop();
 	void loop();
 	void cmd(int arg_cnt, char **args);
+	void setdmh(bool setting);
 
 private:
 	bool m_running;
 	int  m_accelindex;
+	int m_topaccel;
 
 };
 

@@ -27,25 +27,12 @@ void Skittles::loop()
 
 void Skittles::cmd(int arg_cnt, char **args)
 {
-	// Check for Servo command
-	char cmd = args[0][0];
-
-	switch (cmd)
-	{
-	case 'D':
-		// Servo
-		servocmd(arg_cnt, args);
-		break;
-	}
 }
 
-void Skittles::servocmd(int arg_cnt, char **args)
+void Skittles::setdmh(bool setting)
 {
 
-	if (arg_cnt < 2)
-		return;
-
-	if (args[1][0] == '1')
+	if (setting)
 	{
 		servo.write(30);
 		SerialUSB.println("Servo on");

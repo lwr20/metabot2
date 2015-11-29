@@ -38,7 +38,6 @@
 #include "Motors.h"
 #include "CmdUSB.h"
 
-#include "Skittles.h"
 #include "LineFollower.h"
 #include "Joystick.h"
 #include "testmode.h"
@@ -94,7 +93,7 @@ void process_cmd(int arg_cnt, char **args)
 			set_mode(args[1][0]);
 		break;
 
-	case 'S':
+	case 'X':
 		// Emergency stop
 		motors.stop();
 		SerialUSB.println("Emergency Stop");
@@ -103,6 +102,12 @@ void process_cmd(int arg_cnt, char **args)
 	case 'A':
 		// Set Acceleration
 		setAcceleration(arg_cnt, args);
+		break;
+
+	case 'D':
+		// Dead Man's Handle
+		if (arg_cnt > 1)
+			mode->setdmh(args[1][0] == '1');
 		break;
 
 		// Add cases for any generic commands not associated with a specific mode
@@ -118,18 +123,20 @@ void set_mode(char modechar)
 	mode->stop();
 	switch (modechar)
 	{
+	case 'B':
+		mode = &joystick;
+		joystick.setSensitivity(10);
+		break;
+
 	case 'J':
 	case 'R':
 		mode = &joystick;
 		joystick.setDirection(modechar == 'J');
+		joystick.setSensitivity(100);
 		break;
 
 	case 'L':
 		mode = &lineFollower;
-		break;
-
-	case 'B':
-		mode = &skittles;
 		break;
 
 	case 'T':

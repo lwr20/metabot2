@@ -19,6 +19,7 @@ class Skittles : public ModeBase
 	 void stop();
 	 void loop();
 	 void cmd(int arg_cnt, char **args);
+	 void setdmh(bool setting);
 
 private:
 	void servocmd(int arg_cnt, char **args);

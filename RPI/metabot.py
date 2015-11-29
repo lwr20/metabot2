@@ -375,7 +375,7 @@ def main(argv):
                 for s in MODES:
                     print s, MODES[s]
             elif modecmd == "x":
-                mode.send_cmd("S")
+                mode.send_cmd("X")
             elif len(modecmd) > 0 and modecmd[0] == ":":
                 mode.send_cmd(modecmd[1:])
             elif modecmd in MODES and modecmd != "q":
@@ -384,7 +384,7 @@ def main(argv):
     except KeyboardInterrupt:
         pass
 
-    mode.send_cmd("S")  # Send a final Stop command
+    mode.send_cmd("X")  # Send a final Stop command
     # May need a delay or better still some sync in here to stop
     # the controller threads stopping before the Stop command gets out
     remote_controller.running = False

@@ -21,29 +21,24 @@ extern int analogpins[NOPINS];
 
 void LineFollower::start()
 {
-	int i;
-
 	// Initialise trace variables
 	memset(bar, '|', BARLEN);
 
 	// Init other variables
-	state = inactive;
+	setState(inactive);
 	dmh = false;
-	for (i = 0; i < NOPINS; i++)
-	{
-		pinmin[i] = 1024;
-		pinmax[i] = 0;
-	}
 	direrror = 0;
-	speed = LFSPEED;
+	motorspeed = 0;
+	motordir = 0;
+	setspeed = LFSPEED;
 
 	// Turn on line follower light
 	pinMode(LFENABLEPIN, OUTPUT);
 	digitalWrite(LFENABLEPIN, 1);
 
-	// Set instant acceleration
+	// Set fast acceleration
 	motors.stop();
-	motors.setAcceleration(0.0);
+	motors.setAcceleration(2000,0);
 
 	SerialUSB.println("Start Line Follower Mode");
 }
@@ -59,8 +54,6 @@ void LineFollower::loop()
 	int i;
 	int norm;
 	float direction;
-	float lspeed;
-	float rspeed;
 
 	int first = 0;
 	int firsti = 0;
@@ -73,12 +66,7 @@ void LineFollower::loop()
 		// Check if we are on the board and ready to auto-configure
 		if (reflection() && steadyReadings())
 		{
-			state = config;
-			for (i = 0; i < NOPINS; i++)
-			{
-				pinmax[i] = 0;
-				pinmin[i] = 1024;
-			}
+			setState(config);
 		} 
 		else
 		{
@@ -131,12 +119,10 @@ void LineFollower::loop()
 	meannorm /= 5;
 
 
-	// Use the mean of the norms to decide whether to go into config mode or not
+	// Use the mean of the norms to decide whether to go into inactive mode or not
 	if (meannorm > INACTIVETHRESH  && !reflection())
 	{
-		state = inactive;
-		dmh = false;
-		motors.stop();
+		setState(inactive);
 	}
 
 	// Calculate Direction using the highest and second highest readings
@@ -155,34 +141,34 @@ void LineFollower::loop()
 	}
 	direrror = direction - 2;
 
-	// default motor speed is full ahead
-	lspeed = speed;
-	rspeed = speed;
+	// set motor speed and direction
 
-	// set the left and right motor speeds proportional to how far off the 
-	// line we are
-	if (direrror > 0)
+	if (direrror >= -1.0 && direrror <= 1.0)
 	{
-		rspeed = speed * (1.0 - direrror);
-		lspeed = speed * min(1, 2 - direrror);
+		// if direrror is between -1 and +1 then
+		// continue forward at max speed but add direction proportional to the error
+		motorspeed = setspeed;
+		motordir = setspeed * direrror;
 	}
-	else if (direrror < 0)
+	else
 	{
-		lspeed = speed * (1.0 + direrror);
-		rspeed = speed * min(1, 2 + direrror);
+		// if direrror is less than -1 or greater than +1 then
+		// set maximum direction and reduce forward speed proportionally
+		motorspeed = (2 - abs(direrror)) * setspeed;
+		motordir = copysign(setspeed, direrror);
 	}
 
-	if (first + second < 0.1)
+	if (first + second < OFFLINE)
 	{
 		// We've lost the line, go into reverse
-		lspeed = -speed;
-		rspeed = -speed;
+		motorspeed = -setspeed;
+		motordir = 0;
 	}
 
-	if (dmh)
+	if (state == active && dmh)
 	{
-		motors.L->setSpeed(lspeed);
-		motors.R->setSpeed(rspeed);
+		motors.setSpeed(motorspeed);
+		motors.setDirection(motordir);
 	}
 
 	printbars();
@@ -195,11 +181,6 @@ void LineFollower::cmd(int arg_cnt, char **args)
 
 	switch (cmd)
 	{
-	case 'D':
-		// Dead Man's Handle
-		dmhcmd(arg_cnt, args);
-		break;
-
 	case 'P':
 		// Set Speed
 		speedcmd(arg_cnt, args);
@@ -207,22 +188,19 @@ void LineFollower::cmd(int arg_cnt, char **args)
 	}
 }
 
-void LineFollower::dmhcmd(int arg_cnt, char **args)
+void LineFollower::setdmh(bool dmhset)
 {
-	if (arg_cnt < 2)
-		return;
+	dmh = dmhset;
 
-	dmh = (args[1][0] == '1');
-
-	if (!dmh)
-	{
-		motors.stop();
-	}
-	else
+	if (dmhset)
 	{
 		motors.setEnableOutputs(true);
 		if (state == config)
-			state = active;
+			setState(active);
+	}
+	else
+	{
+		motors.stop();
 	}
 }
 
@@ -231,7 +209,7 @@ void LineFollower::speedcmd(int arg_cnt, char **args)
 	if (arg_cnt < 2)
 		return;
 
-	speed = float(cmdStr2Num(args[1], 10));
+	setspeed = cmdStr2Num(args[1], 10);
 }
 
 void LineFollower::printbars()
@@ -282,7 +260,7 @@ void LineFollower::printbars()
 		int endbar = round(pinnrm[i] / 12);
 		bar[endbar] = 0;
 		SerialUSB.print("\x1b[2K");  // Delete Line
-		if (config != inactive)
+		if (state != inactive)
 		{
 			SerialUSB.print(pinnrm[i]);
 			SerialUSB.print("\t");
@@ -299,10 +277,12 @@ void LineFollower::printbars()
 	SerialUSB.println("\x1b[2K");
 	SerialUSB.print("\x1b[2Kstate: ");
 	SerialUSB.print(state);
-	SerialUSB.print("\t dmh: ");
-	SerialUSB.print(dmh);
 	SerialUSB.print("\t direrror : ");
-	SerialUSB.println(direrror);
+	SerialUSB.print(direrror);
+	SerialUSB.print("\t speed : ");
+	SerialUSB.print(motorspeed);
+	SerialUSB.print("\t direction : ");
+	SerialUSB.println(motordir);
 	SerialUSB.print("\x1b[14F");  // Scroll back 14 lines
 }
 
@@ -312,7 +292,8 @@ bool LineFollower::reflection()
 	// Test is that blinking the light makes a difference to all 5 LEDS
 
 	int i;
-	uint32_t darkpinval;
+	int darkpinval;
+	bool retval = true;
 
 	for (i = 0; i < NOPINS; i++)
 	{
@@ -320,21 +301,21 @@ bool LineFollower::reflection()
 	}
 
 	digitalWrite(LFENABLEPIN, 0);
-	delayMicroseconds(200);            // Need to wait a bit for the LED to turn off
+	delayMicroseconds(500);            // Need to wait a bit for the LED to turn off
 
 	for (i = 0; i < NOPINS; i++)
 	{
 		//  We've turned off the LED.  If read values don't go up by more than
-		// The error margin, we'll assume that we are not close enough to the board to detect it
+		// The error margin, then we aren't getting a reflection
 		darkpinval = analogRead(analogpins[i]);
-		if ((darkpinval - ERRORMARGIN) < pinval[i])
+		if ((darkpinval - REFLECTMARGIN) < pinval[i])
 		{
-			digitalWrite(LFENABLEPIN, 1);
-			return false;
+			retval = false;
 		}
 	}
 	digitalWrite(LFENABLEPIN, 1);
-	return true;
+	delayMicroseconds(500);            // Wait a bit for the LED to turn back on
+	return retval;
 }
 
 bool LineFollower::steadyReadings()
@@ -345,12 +326,14 @@ bool LineFollower::steadyReadings()
 	int j;
 
 	static int startMillis;
-	static uint32_t startpinval[NOPINS];
+	static int startpinval[NOPINS];
 
 	for (i = 0; i < NOPINS; i++)
 	{
-		if (abs(pinval[i] - startpinval[i]) > ERRORMARGIN)
+		if (abs(pinval[i] - startpinval[i]) > STEADYMARGIN)
 		{
+			// Pin is not within range of the starting position
+			// Reset the clock and the starting position
 			startMillis = millis();
 			for (j = 0; j < NOPINS; j++)
 				startpinval[j] = pinval[j];
@@ -367,6 +350,28 @@ bool LineFollower::steadyReadings()
 	return true;
 
 }
+
+void LineFollower::setState(State newstate)
+{
+	int i;
+	state = newstate;
+
+	if (state == inactive || state == config)
+	{
+		for (i = 0; i < NOPINS; i++)
+		{
+			pinmin[i] = 1024;
+			pinmax[i] = 0;
+		}
+	}
+
+	if (state == inactive)
+	{
+		dmh = false;
+		motors.stop();
+	}
+}
+
 
 LineFollower lineFollower;
 

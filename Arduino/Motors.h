@@ -24,7 +24,7 @@
 // Other constants
 #define MICROSTEP			16
 #define STOPTIME			1000      // Number of milliseconds to hold motor when stopping.  After this time the motor is disabled (and so can freewheel);
-#define STOPPINGSPEED		3         // Target speed when coming to an automatice stop
+#define STOPPINGSPEED		10      // Target speed when coming to an automatice stop
 #define DFLTACCELERATION	1000
 #define DFLTROTACCELERATION	1000
 class Motors
@@ -45,13 +45,11 @@ class Motors
 	uint32_t currentPositionL();
 	uint32_t currentPositionR();
 	void setCurrentPosition(uint32_t positionL, uint32_t positionR);
+	void resetTargetPosition();
 	bool isStopped();
 	bool atTargetPosition();
 	float currentSpeed();
 	float currentDirection();
-
-	InterruptStepper* L;
-	InterruptStepper* R;
 
 	/*
 	boolean runSpeed();
@@ -70,6 +68,9 @@ private:
 	void		setNewSpeed(uint16_t period);
 	float       accelerate(float start, float current, float target, float acceleration);
 	uint32_t	stoppingDistance();
+
+	InterruptStepper* L;
+	InterruptStepper* R;
 
 	uint32_t	_targetL;			// PWM Pulses (interrupt count)
 	uint32_t	_targetR;			// PWM Pulses (interrupt count)
