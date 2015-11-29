@@ -23,6 +23,7 @@ public:
 private:
 	bool m_running;
 	int  m_accelindex;
+	int m_topaccel;
 
 };
 

@@ -13,7 +13,7 @@
 #include "Lights.h"
 
 #define HIGHSPEED 200
-#define SLOWSPEED 5
+#define SLOWSPEED 10
 #define SLOWDISTANCE 30
 
 class Proximity : public ModeBase

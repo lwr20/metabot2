@@ -12,13 +12,19 @@
 void Joystick::start()
 {
 	SerialUSB.println("Start Joystick Mode");
+	servo.attach(SERVOPIN);
+	servoon = SERVOON;
+	servooff = SERVOOFF;
+	servo.write(servooff);
 	motors.stop();
+	sensitivity = 100;
 	motors.setAcceleration(JOYACCELERATION, JOYROTACCELERATION);
 }
 
 void Joystick::stop()
 {
 	SerialUSB.println("Stop Joystick Mode");
+	servo.detach();
 }
 
 void Joystick::loop()
@@ -52,15 +58,37 @@ void Joystick::cmd(int arg_cnt, char **args)
 {
 	if (args[0][0] == 'F')
 		setForward(arg_cnt, args);
+	else if (args[0][0] == 'V' && arg_cnt >= 2)
+		sensitivity = cmdStr2Num(args[1], 10);
+	else if (args[0][0] == 'C' && arg_cnt >= 3)
+	{
+		servooff = cmdStr2Num(args[1], 10);
+		servoon = cmdStr2Num(args[1], 10);
+	}
 }
 
 void Joystick::setdmh(bool setting)
 {
+	if (setting)
+	{
+		servo.write(servoon);
+		SerialUSB.println("Servo on");
+	}
+	else
+	{
+		servo.write(servooff);
+		SerialUSB.println("Servo off");
+	}
 }
 
 void Joystick::setDirection(bool direction)
 {
 	_normdir = direction;
+}
+
+void Joystick::setSensitivity(int s)
+{
+	sensitivity = s;
 }
 
 void Joystick::setForward(int arg_cnt, char **args) {
@@ -80,14 +108,14 @@ void Joystick::setForward(int arg_cnt, char **args) {
 	{
 		if (arg_cnt == 2)
 		{
-			speed = float(cmdStr2Num(args[1], 10));
+			speed = cmdStr2Num(args[1], 10) * sensitivity / 100;
 			direction = 0;
 			SerialUSB.println(speed);
 		}
 		else if (arg_cnt == 3)
 		{
-			speed = float(cmdStr2Num(args[1], 10));
-			direction = float(cmdStr2Num(args[2], 10));
+			speed = cmdStr2Num(args[1], 10) * sensitivity / 100;
+			direction = cmdStr2Num(args[2], 10)  * sensitivity / 100;
 			SerialUSB.print(speed);
 			SerialUSB.print("  ");
 			SerialUSB.println(direction);

@@ -12,11 +12,13 @@
 #include "modebase.h"
 #include "Lights.h"
 
-#define LFSPEED 60.0
+#define LFSPEED 150
 #define INACTIVETHRESH 800
 #define STEADYTIME 1000
-#define ERRORMARGIN 5
+#define REFLECTMARGIN 50
+#define STEADYMARGIN 10
 #define SPREADMARGIN 300
+#define OFFLINE 400
 
 class LineFollower : public ModeBase
 {
@@ -36,12 +38,16 @@ class LineFollower : public ModeBase
 
 	enum State { inactive, config, active };
 	State state;
-	uint32_t pinmin[NOPINS];
-	uint32_t pinmax[NOPINS];
-	uint32_t pinval[NOPINS];
-	float pinnrm[NOPINS];
+	void setState(State);
+
+	int pinmin[NOPINS];
+	int pinmax[NOPINS];
+	int pinval[NOPINS];
+	int pinnrm[NOPINS];
 	float direrror;
-	float speed;
+	int setspeed;
+	int motorspeed;
+	int motordir;
 
 	char bar[BARLEN];
 

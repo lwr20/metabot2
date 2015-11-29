@@ -3,7 +3,7 @@
 
 #define MODESPEED	200
 #define MODEDIR  	40
-#define TURN90COUNT   1300
+#define TURN90COUNT   1350
 
 enum Actions {Forward, Backward, TurnLeft, TurnRight, Stop};
 
@@ -14,13 +14,13 @@ struct Action {
 
 #define STEPS 8
 Action sequence[STEPS]= {
-	{ Forward, 15000 },
+	{ Forward, 15500 },
 	{ TurnLeft, TURN90COUNT },
-	{ Forward, 3500 },
+	{ Forward, 3000 },
 	{ Backward, 7000 },
-	{ Forward, 3500 },
+	{ Forward, 4000 },
 	{ TurnLeft, TURN90COUNT },
-	{ Forward, 13000 },
+	{ Forward, 14000 },
 	{ Stop, 1000 },
 };
 

@@ -7,7 +7,7 @@ void Proximity::start()
 {
 	SerialUSB.println("Proximity Alert Mode");
 	motors.setCurrentPosition(0, 0);
-	motors.setAcceleration(0, 0);  // instant acceleration
+	motors.setAcceleration(1000, 0);  // fast acceleration
 	m_currentSpeed = 0;
 	m_running = false;
 	m_config = false;
@@ -31,8 +31,8 @@ void Proximity::stop()
 {
 	SerialUSB.println("Proximity Alert Mode");
 	// Disable lights
-	lights.setEnabled(true);
-	
+	lights.setEnabled(false);
+
 }
 
 void Proximity::loop()
@@ -41,6 +41,23 @@ void Proximity::loop()
 
 	if (m_config)
 	{
+		if (motors.atTargetPosition())
+		{
+			m_config = false;
+			SerialUSB.print("val70 = ");
+			SerialUSB.print(val70[0]);
+			SerialUSB.print(", ");
+			SerialUSB.print(val70[1]);
+			SerialUSB.print(", ");
+			SerialUSB.println(val70[2]);
+			SerialUSB.print("val500 = ");
+			SerialUSB.print(val500[0]);
+			SerialUSB.print(", ");
+			SerialUSB.print(val500[1]);
+			SerialUSB.print(", ");
+			SerialUSB.println(val500[2]);
+		}
+
 		for (int i = 1; i < 4; i++)
 		{
 			SerialUSB.print(lights.lightval[i]);
@@ -68,16 +85,24 @@ void Proximity::cmd(int arg_cnt, char **args)
 		if (arg_cnt >= 2)
 		{
 			int32_t speed = cmdStr2Num(args[1], 10);
-			if (speed <= -500 && !m_running)
+			if (!m_running)
 			{
-				if (!m_config)
+				if (speed <= -500)
 				{
-					m_config = true;
-					SerialUSB.println("left, middle, right, left_wheel, right_wheel");
-					motors.setCurrentPosition(0, 0);
-					motors.move(600);
-					motors.setSpeedDirection(-SLOWSPEED, 0);
-					motors.setEnableOutputs(true);
+					if (!m_config)
+					{
+						m_config = true;
+						SerialUSB.println("left, middle, right, left_wheel, right_wheel");
+						motors.setCurrentPosition(0, 0);
+						motors.move(600);
+						motors.setSpeedDirection(-SLOWSPEED, 0);
+						motors.setEnableOutputs(true);
+					}
+				}
+				else
+				{
+					m_config = false;
+					motors.stop();
 				}
 			}
 		}
@@ -167,19 +192,19 @@ void Proximity::updateSpeed(int32_t* values)
 	if (diff500 > 0)
 	{
 		m_currentSpeed = HIGHSPEED;
-		motors.setSpeedDirection(m_currentSpeed, 0);
+		motors.setSpeed(m_currentSpeed);
 		return;
 	}
 
-	if (diff70 < 0)
+	if (diff70 > 0)
 	{
-		motors.stop();
-		m_running = false;
+		m_currentSpeed = SLOWSPEED;
+		motors.setSpeed(m_currentSpeed);
 		return;
 	}
 
-	m_currentSpeed = SLOWSPEED;
-	motors.setSpeedDirection(m_currentSpeed, 0);
+	motors.move(30);
+	m_running = false;
 }
 
 Proximity proximity;

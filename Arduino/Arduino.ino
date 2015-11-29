@@ -38,7 +38,6 @@
 #include "Motors.h"
 #include "CmdUSB.h"
 
-#include "Skittles.h"
 #include "LineFollower.h"
 #include "Joystick.h"
 #include "testmode.h"
@@ -124,18 +123,20 @@ void set_mode(char modechar)
 	mode->stop();
 	switch (modechar)
 	{
+	case 'B':
+		mode = &joystick;
+		joystick.setSensitivity(20);
+		break;
+
 	case 'J':
 	case 'R':
 		mode = &joystick;
 		joystick.setDirection(modechar == 'J');
+		joystick.setSensitivity(100);
 		break;
 
 	case 'L':
 		mode = &lineFollower;
-		break;
-
-	case 'B':
-		mode = &skittles;
 		break;
 
 	case 'T':
