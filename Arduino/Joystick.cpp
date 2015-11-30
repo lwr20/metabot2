@@ -9,12 +9,18 @@
 #include "Motors.h"
 #include "CmdUSB.h"
 
+Joystick::Joystick()
+{
+	sensitivity = 100; 
+	_normdir = true;
+	servoon = SERVOON;
+	servooff = SERVOOFF;
+}
+
 void Joystick::start()
 {
 	SerialUSB.println("Start Joystick Mode");
 	servo.attach(SERVOPIN);
-	servoon = SERVOON;
-	servooff = SERVOOFF;
 	servo.write(servooff);
 	motors.stop();
 	motors.setAcceleration(JOYACCELERATION, JOYROTACCELERATION);

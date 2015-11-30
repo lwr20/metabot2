@@ -22,6 +22,8 @@ class Joystick : public ModeBase
 {
 
   public:
+	Joystick();
+
 	void start();
 	void stop();
 	void loop();

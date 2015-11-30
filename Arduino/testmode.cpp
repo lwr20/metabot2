@@ -28,16 +28,12 @@ void Testmode::loop()
 {
 	static int last_time = 0;
 	int time = millis() / 500;
-	int16_t accelCount[3];
 
-	if (time != last_time && MPU9250.isDataReady())
+	if (time != last_time )
 	{
 		last_time = time;
-		MPU9250.readAccelData(accelCount);
-		int ax = accelCount[0];
-		int ay = accelCount[1]; 
-		int az = accelCount[2];
-		SerialUSB.print(ax); SerialUSB.print(", "); SerialUSB.print(ay); SerialUSB.print(", "); SerialUSB.println(az);
+		MPU9250.showReg();
+		SerialUSB.print("\x1b[17F");  // Scroll back 17 lines
 	}
 }
 

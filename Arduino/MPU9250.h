@@ -50,6 +50,8 @@ enum Mscale {
 class MPU9250Class
 {
  public:
+	 MPU9250Class();
+
 	void init();
 	void loop();
 
@@ -58,10 +60,10 @@ class MPU9250Class
 	void readAccelData(int16_t * destination);
 	void readGyroData(int16_t * destination);
 	bool isDataReady();
+	void showReg();
 
  private:
 	 void initAK8963(float * destination);
-	 void initvars();
 	 void initMPU9250();
 	 void calibrateMPU9250(float * dest1, float * dest2);
 	 void MPU9250SelfTest(float * destination);
@@ -74,8 +76,8 @@ class MPU9250Class
      void tilt_compensation(float ax, float ay, float az, float raw_mx, float raw_my, float raw_mz);
 
 	uint8_t readByte(uint8_t reg);
-	uint16_t readWord(uint8_t reg);
-	uint16_t readFIFOWord();
+	int16_t readWord(uint8_t reg);
+	int16_t readFIFOWord();
 	void writeByte(uint8_t reg, uint8_t data);
 	uint8_t readMagByte(uint8_t reg);
 	void writeMagByte(uint8_t reg, uint8_t data);

@@ -2,6 +2,7 @@
 #include "Motors.h"
 #include "Lights.h"
 #include "CmdUSB.h"
+#include "MPU9250.h"
 
 #define MAXSPEED 20000
 #define ERRTHRESHOLD 20
@@ -36,8 +37,13 @@ void SpeedTest::stop()
 
 void SpeedTest::loop()
 {
+
+	int16_t acceldata[3];
+
 	// Get current speed and check whether we need to move to the next level of acceleration
 	int speed = motors.currentSpeed();
+
+	MPU9250.readAccelData(acceldata);
 
 	int i = 0;
 	while (speed > speedthreshold[i])
@@ -87,7 +93,8 @@ void SpeedTest::loop()
 		{
 			SerialUSB.print("Current Speed : "); SerialUSB.print(speed);
 			SerialUSB.print("   Lights : "); SerialUSB.print(leftlight); SerialUSB.print(", "); SerialUSB.print(rightlight);
-			SerialUSB.print("   Error : "); SerialUSB.println(error);
+			SerialUSB.print("   Error : "); SerialUSB.print(error);
+			SerialUSB.print("   Acceleration : "); SerialUSB.println(acceldata[1]);  // forward direction is y, so second entry in array
 		}
 	}
 }
