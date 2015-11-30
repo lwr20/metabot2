@@ -46,7 +46,7 @@ ModeBase * mode = &joystick;
 
 void setup()
 {
-	SerialUSB.begin(9600);
+	SerialUSB.begin(115200);
 	SerialUSB.println("Initialising...");
 
 	// CMD Setup - uses Serial3

@@ -9,10 +9,51 @@
 
 #define CSPIN 4
 
+MPU9250Class::MPU9250Class()
+{
+	int i;
+	Gscale = GFS_250DPS;
+	Ascale = AFS_2G;
+	Mscale = MFS_16BITS;
+	Mmode = 0x06;
+
+	for (i = 0; i < 3; i++)
+	{
+		magCalibration[i] = 0;
+		gyroBias[i] = 0;
+		accelBias[i] = 0;
+		eInt[i] = 0.0f;
+	}
+
+	magbias[0] = 0; // +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
+	magbias[1] = 0; //+120.;  // User environmental y-axis correction in milliGauss
+	magbias[2] = 0; //+125.;  // User environmental z-axis correction in milliGauss
+
+	GyroMeasError = PI * (40.0f / 180.0f);
+	GyroMeasDrift = PI * (0.0f / 180.0f);
+	beta = sqrt(3.0f / 4.0f) * GyroMeasError;
+	zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;
+
+	delt_t = 0;
+	count = 0;
+	sumCount = 0;
+	deltat = 0.0f;
+	sum = 0.0f;
+	lastUpdate = 0;
+	firstUpdate = 0;
+	Now = 0;
+
+	q[0] = 1.0f;
+	for (i = 1; i < 4; i++)
+		q[i] = 0.0f;
+
+	aRes = getAres();
+	gRes = getGres();
+	mRes = getMres();
+}
+
 void MPU9250Class::init()
 {
-	initvars();
-
 	// Fire up the SPI interface
 	SPI.begin(CSPIN);
 	SPI.setClockDivider(CSPIN, 84);
@@ -84,49 +125,6 @@ void MPU9250Class::tilt_compensation(float ax, float ay, float az, float raw_mx,
 	SerialUSB.print("Compensated Heading");  SerialUSB.println(heading);
 }
 
-void MPU9250Class::initvars()
-{
-	int i;
-	Gscale = GFS_250DPS;
-	Ascale = AFS_2G;
-	Mscale = MFS_16BITS;
-	Mmode = 0x06;
-
-	for (i = 0; i < 3; i++)
-	{
-		magCalibration[i] = 0;
-		gyroBias[i] = 0;
-		accelBias[i] = 0;
-		eInt[i] = 0.0f;
-	}
-
-	magbias[0] = 0; // +470.;  // User environmental x-axis correction in milliGauss, should be automatically calculated
-	magbias[1] = 0; //+120.;  // User environmental y-axis correction in milliGauss
-	magbias[2] = 0; //+125.;  // User environmental z-axis correction in milliGauss
-
-	GyroMeasError = PI * (40.0f / 180.0f);
-	GyroMeasDrift = PI * (0.0f / 180.0f);
-	beta = sqrt(3.0f / 4.0f) * GyroMeasError;
-	zeta = sqrt(3.0f / 4.0f) * GyroMeasDrift;
-
-	delt_t = 0;
-	count = 0;
-	sumCount = 0;
-	deltat = 0.0f;
-	sum = 0.0f;
-	lastUpdate = 0;
-	firstUpdate = 0;
-	Now = 0;
-
-	q[0] = 1.0f;
-	for (i = 1; i < 4; i++)
-		q[i] = 0.0f;
-
-	aRes = getAres();
-	gRes = getGres();
-	mRes = getMres();
-}
-
 void MPU9250Class::loop()
 {
 	// If intPin goes high, all data registers have new data
@@ -134,16 +132,16 @@ void MPU9250Class::loop()
 		readAccelData(accelCount);  // Read the x/y/z adc values
 
 		// Now we'll calculate the accleration value into actual g's
-		ax = (float)accelCount[0]; // - accelBias[0];  // get actual g value, this depends on scale being set
-		ay = (float)accelCount[1]; // - accelBias[1];
-		az = (float)accelCount[2]; // - accelBias[2];
+		ax = (float)accelCount[0] * aRes; // - accelBias[0];  // get actual g value, this depends on scale being set
+		ay = (float)accelCount[1] * aRes; // - accelBias[1];
+		az = (float)accelCount[2] * aRes; // - accelBias[2];
 
 		readGyroData(gyroCount);  // Read the x/y/z adc values
 
 		// Calculate the gyro value into actual degrees per second
-		gx = (float)gyroCount[0];  // get actual gyro value, this depends on scale being set
-		gy = (float)gyroCount[1];
-		gz = (float)gyroCount[2];
+		gx = (float)gyroCount[0] * gRes;  // get actual gyro value, this depends on scale being set
+		gy = (float)gyroCount[1] * gRes;
+		gz = (float)gyroCount[2] * gRes;
 
 		readMagData(magCount);  // Read the x/y/z adc values
 
@@ -241,6 +239,78 @@ void MPU9250Class::loop()
 	}
 }
 
+void MPU9250Class::showReg()
+{
+	int reg = 0;
+	int col;
+	int row;
+	uint8_t regbyte;
+
+	//MPU9250 has 127 registers numbered 0 - 126
+	SerialUSB.println("MPU 9250 Registers");
+	for (row = 0; row < 8; row++)
+	{
+		SerialUSB.print(reg);
+		SerialUSB.print(":\t");
+		for (col = 0; col < 16; col++)
+		{
+			if (reg <= 126)
+			{
+				regbyte = readByte(reg);
+				SerialUSB.print(regbyte,16);
+				SerialUSB.print("  ");
+				if (regbyte < 16)
+					SerialUSB.print(" ");
+
+			}
+			reg++;
+		}
+		SerialUSB.println();
+	}
+
+	// Magnetometer has 19 registers 0 -18
+	SerialUSB.println();  
+	SerialUSB.println("Magnetometer Registers");
+	reg = 0;
+	for (row = 0; row < 2; row++)
+	{
+		SerialUSB.print(reg);
+		SerialUSB.print(":\t");
+		for (col = 0; col < 16; col++)
+		{
+			if (reg <= 18)
+			{
+				regbyte = readMagByte(reg);
+				SerialUSB.print(regbyte, 16);
+				SerialUSB.print("  ");
+				if (regbyte < 16)
+					SerialUSB.print(" ");
+			}
+			reg++;
+		}
+		SerialUSB.println();
+	}
+
+	// Print Interesting Registers
+
+	int16_t a[3];
+	int16_t g[3];
+
+	a[0] = readWord(ACCEL_XOUT_H);
+	a[1] = readWord(ACCEL_YOUT_H);
+	a[2] = readWord(ACCEL_ZOUT_H);
+	g[0] = readWord(GYRO_XOUT_H);
+	g[1] = readWord(GYRO_YOUT_H);
+	g[2] = readWord(GYRO_ZOUT_H);
+
+	SerialUSB.println();
+	SerialUSB.println("Reg\tx\ty\tz");
+	SerialUSB.print("\x1b[2KAccel\t"); SerialUSB.print(a[0]); SerialUSB.print("\t"); SerialUSB.print(a[1]); SerialUSB.print("\t"); SerialUSB.println(a[2]);
+	SerialUSB.print("\x1b[2KGyro\t");  SerialUSB.print(g[0]); SerialUSB.print("\t"); SerialUSB.print(g[1]); SerialUSB.print("\t"); SerialUSB.println(g[2]);
+}
+
+
+
 //===================================================================================================================
 //====== Set of useful function to access acceleration. gyroscope, magnetometer, and temperature data
 //===================================================================================================================
@@ -315,16 +385,16 @@ bool MPU9250Class::isDataReady()
 
 void MPU9250Class::readAccelData(int16_t * destination)
 {
-	destination[0] = readWord(ACCEL_XOUT_H) * aRes;
-	destination[1] = readWord(ACCEL_YOUT_H) * aRes;
-	destination[2] = readWord(ACCEL_ZOUT_H) * aRes;
+	destination[0] = readWord(ACCEL_XOUT_H);
+	destination[1] = readWord(ACCEL_YOUT_H);
+	destination[2] = readWord(ACCEL_ZOUT_H);
 }
 
 void MPU9250Class::readGyroData(int16_t * destination)
 {
-	destination[0] = readWord(GYRO_XOUT_H) * gRes;
-	destination[1] = readWord(GYRO_YOUT_H) * gRes;
-	destination[2] = readWord(GYRO_ZOUT_H) * gRes;
+	destination[0] = readWord(GYRO_XOUT_H);
+	destination[1] = readWord(GYRO_YOUT_H);
+	destination[2] = readWord(GYRO_ZOUT_H);
 }
 
 bool MPU9250Class::readMagData(int16_t * destination)
@@ -491,6 +561,10 @@ void MPU9250Class::calibrateMPU9250(float * dest1, float * dest2)
 	gyro_bias[1] /= (int32_t)packet_count;
 	gyro_bias[2] /= (int32_t)packet_count;
 
+	//Serial3.print("Calculated Accel Bias X: "); Serial3.println(accel_bias[0]);
+	//Serial3.print("Calculated Accel Bias Y: "); Serial3.println(accel_bias[1]);
+	//Serial3.print("Calculated Accel Bias Z: "); Serial3.println(accel_bias[2]);
+
 	if (accel_bias[2] > 0L) { accel_bias[2] -= (int32_t)accelsensitivity; }  // Remove gravity from the z-axis accelerometer bias calculation
 	else { accel_bias[2] += (int32_t)accelsensitivity; }
 
@@ -526,6 +600,10 @@ void MPU9250Class::calibrateMPU9250(float * dest1, float * dest2)
 	accel_bias_reg[1] = readWord(YA_OFFSET_H);
 	accel_bias_reg[2] = readWord(ZA_OFFSET_H);
 
+	//Serial3.print("Factory Accel Trim X: "); Serial3.println(accel_bias_reg[0]);
+	//Serial3.print("Factory Accel Trim Y: "); Serial3.println(accel_bias_reg[1]);
+	//Serial3.print("Factory Accel Trim Z: "); Serial3.println(accel_bias_reg[2]);
+
 	uint32_t mask = 1uL; // Define mask for temperature compensation bit 0 of lower byte of accelerometer bias registers
 	uint8_t mask_bit[3] = { 0, 0, 0 }; // Define array to hold mask bit for each accelerometer bias axis
 
@@ -537,6 +615,10 @@ void MPU9250Class::calibrateMPU9250(float * dest1, float * dest2)
 	accel_bias_reg[0] -= (accel_bias[0] / 8); // Subtract calculated averaged accelerometer bias scaled to 2048 LSB/g (16 g full scale)
 	accel_bias_reg[1] -= (accel_bias[1] / 8);
 	accel_bias_reg[2] -= (accel_bias[2] / 8);
+
+	//Serial3.print("Updated Accel Bias X: "); Serial3.println(accel_bias_reg[0]);
+	//Serial3.print("Updated Accel Bias Y: "); Serial3.println(accel_bias_reg[1]);
+	//Serial3.print("Updated Accel Bias Z: "); Serial3.println(accel_bias_reg[2]);
 
 	data[0] = (accel_bias_reg[0] >> 8) & 0xFF;
 	data[1] = (accel_bias_reg[0]) & 0xFF;
@@ -579,7 +661,9 @@ void MPU9250Class::MPU9250SelfTest(float * destination) // Should return percent
 	writeByte(ACCEL_CONFIG2, 0x02);		// Set accelerometer rate to 1 kHz and bandwidth to 92 Hz
 	writeByte(ACCEL_CONFIG, 1 << FS);	// Set full scale range for the accelerometer to 2 g
 
-	for (int ii = 0; ii < 200; ii++) {  // get average current values of gyro and acclerometer
+	for (int ii = 0; ii < 200; ii++) 
+	{  // get average current values of gyro and acclerometer
+		//waitDataReady();
 		aAvg[0] += readWord(ACCEL_XOUT_H);
 		aAvg[1] += readWord(ACCEL_YOUT_H);
 		aAvg[2] += readWord(ACCEL_ZOUT_H);
@@ -599,7 +683,9 @@ void MPU9250Class::MPU9250SelfTest(float * destination) // Should return percent
 	writeByte(GYRO_CONFIG, 0xE0); // Enable self test on all three axes and set gyro range to +/- 250 degrees/s
 	delay(25);  // Delay a while to let the device stabilize
 
-	for (int ii = 0; ii < 200; ii++) {  // get average self-test values of gyro and acclerometer
+	for (int ii = 0; ii < 200; ii++) 
+	{  // get average self-test values of gyro and acclerometer
+		//waitDataReady();
 		aSTAvg[0] += readWord(ACCEL_XOUT_H);
 		aSTAvg[1] += readWord(ACCEL_YOUT_H);
 		aSTAvg[2] += readWord(ACCEL_ZOUT_H);
@@ -656,7 +742,7 @@ void MPU9250Class::writeByte(uint8_t reg, uint8_t data)
 	SPI.transfer(CSPIN, data, SPI_LAST);
 }
 
-uint16_t MPU9250Class::readWord(uint8_t reg)
+int16_t MPU9250Class::readWord(uint8_t reg)
 {
 	uint16_t retval;
 	retval = readByte(reg);			// read high byte
@@ -665,7 +751,7 @@ uint16_t MPU9250Class::readWord(uint8_t reg)
 	return retval;
 }
 
-uint16_t MPU9250Class::readFIFOWord()
+int16_t MPU9250Class::readFIFOWord()
 {
 	uint16_t retval;
 	retval = readByte(FIFO_R_W);	// read high byte
