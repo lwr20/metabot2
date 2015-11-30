@@ -173,16 +173,16 @@ class RemoteController(Controller):
     def run(self):
         logger.info("Remote Controller Thread Running")
         port = 10000
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(1.0)
-        s.bind((self._ipaddress, port))
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1.0)
+        sock.bind((self._ipaddress, port))
         addr = None
 
         logger.info("Waiting for Controller Connection")
         while self.running:
-            s.listen(1)
+            sock.listen(1)
             try:
-                self.conn, addr = s.accept()
+                self.conn, addr = sock.accept()
                 self.conn.setblocking(1)
             except socket.timeout:
                 pass
@@ -365,15 +365,15 @@ def main(argv):
     local_controller.start()
 
     print("Enter Mode Values :")
-    for s in MODES:
-        print s, MODES[s]
+    for mode in MODES:
+        print mode, MODES[mode]
     modecmd = "j"
     try:
         while modecmd != "q":
             modecmd = raw_input("New Mode :")
             if modecmd == "?":
-                for s in MODES:
-                    print s, MODES[s]
+                for mode in MODES:
+                    print mode, MODES[mode]
             elif modecmd == "x":
                 mode.send_cmd("X")
             elif len(modecmd) > 0 and modecmd[0] == ":":
