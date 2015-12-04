@@ -1,8 +1,8 @@
 #include "ThreePointTurn.h"
 #include "Motors.h"
 
-#define MODESPEED	200
-#define MODEDIR  	40
+#define MODESPEED	500    // 200
+#define MODEDIR  	100     // 40
 #define TURN90COUNT   1350
 
 enum Actions {Forward, Backward, TurnLeft, TurnRight, Stop};
@@ -30,7 +30,7 @@ void ThreePointTurn::start()
 	SerialUSB.println("Start Three Point Turn Mode");
 
 	motors.setCurrentPosition(0, 0);
-	motors.setAcceleration(100, 50);
+	motors.setAcceleration(300, 100);
 	m_step = 0;
 	m_running = false;
 	SerialUSB.print("Position : "); SerialUSB.print(motors.currentPositionL()); SerialUSB.print(", "); SerialUSB.println(motors.currentPositionR());
@@ -44,7 +44,7 @@ void ThreePointTurn::stop()
 
 void ThreePointTurn::loop()
 {
-	if (motors.atTargetPosition() && motors.isStopped())
+	if (m_running && motors.atTargetPosition() && motors.isStopped())
 	{
 		SerialUSB.print("Position : "); SerialUSB.print(motors.currentPositionL()); SerialUSB.print(", "); SerialUSB.println(motors.currentPositionR());
 		m_step++;
@@ -61,15 +61,15 @@ void ThreePointTurn::setdmh(bool dmhset)
 {
 	if (dmhset)
 	{
+		m_running = true;
+		motors.setEnableOutputs(true);
+		motors.setSpeedDirection(m_currentSpeed, m_currentDirection);
 		if (sequence[m_step].action == Stop)
 		{
 			// Reset to the beginning of the sequence
 			m_step = 0;
 			startStep(m_step);
 		}
-		motors.setSpeedDirection(m_currentSpeed, m_currentDirection);
-		motors.setEnableOutputs(true);
-		m_running = true;
 	}
 	else
 	{
