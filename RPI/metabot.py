@@ -61,22 +61,21 @@ import getopt
 import logging
 import os
 import serial
+import shlex
+import subprocess
 import pykka
 import pygame
 import time
+import RPi.GPIO as GPIO
 
-
-from itertools import cycle
 from pygame.locals import *
 
 # Set the display to fb1 - i.e. the TFT
 os.environ["SDL_FBDEV"] = "/dev/fb1"
 # Remove mouse
 os.environ["SDL_NOMOUSE"] = "1"
-
 # initialise pygame module
 pygame.init()
-
 # set up the window
 screen = pygame.display.set_mode((240, 320), 0, 32)
 
@@ -121,10 +120,11 @@ class TraceConsumer(threading.Thread):
         self.serial_log_file = open("seriallog.txt", 'w', 0)
 
     def run(self):
+        line = None
         while True:
             try:
                 line = self.ser.readline()
-            except SerialException:
+            except serial.SerialException:
                 print "Serial exception hit, ignoring"
             self.serial_log_file.write(line)
 
@@ -382,7 +382,7 @@ class JoystickMode(Mode):
         # Move J and RJ modes to the front to allow us to flip the robot
         # direction quickly
         self.modelist.insert(0, self.modelist.pop(self.modelist.index('j')))
-        self.modelist.insert(0, self.modelist.pop(self.modelist.index('rj')))
+        self.modelist.insert(0, self.modelist.pop(self.modelist.index('r')))
 
     def controller_update(self, update):
         if "pos" in update:
@@ -422,6 +422,16 @@ class JoystickMode(Mode):
 
 
 def main(argv):
+    # Reset Arduino
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(17, GPIO.OUT)
+    GPIO.output(17, GPIO.HIGH)
+    time.sleep(0.1)
+    GPIO.output(17, GPIO.LOW)
+    GPIO.cleanup()
+    time.sleep(1)
+
+    print "Starting main"
     logging.basicConfig(level=logging.WARNING)
 
     host = DEFAULT_HOST
@@ -436,9 +446,10 @@ def main(argv):
         elif opt == '-d':
             logger.setLevel(level=logging.DEBUG)
 
-    serial_logger = TraceConsumer()
-    serial_logger.daemon = True
-    serial_logger.start()
+    print "starting serial logger"
+    command = "cat /dev/ttyACM0 > /home/pi/metabot2/seriallog.txt"
+    serial_logger = subprocess.Popen(command, shell=True)
+    print "starting arduino"
     arduino = Arduino.start().proxy()
     mode = JoystickMode.start(arduino).proxy()
     remote_controller = RemoteController(host, mode)
@@ -490,4 +501,5 @@ def display_image(filename):
 
 
 if __name__ == "__main__":
+    print "Looks like I've been run - kicking off main"
     main(sys.argv[1:])
