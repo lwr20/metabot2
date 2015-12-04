@@ -122,7 +122,10 @@ class TraceConsumer(threading.Thread):
 
     def run(self):
         while True:
-            line = self.ser.readline()
+            try:
+                line = self.ser.readline()
+            except SerialException:
+                print "Serial exception hit, ignoring"
             self.serial_log_file.write(line)
 
 
