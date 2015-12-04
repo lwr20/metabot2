@@ -59,9 +59,25 @@ import struct
 import json
 import getopt
 import logging
+import os
 import serial
+import shlex
+import subprocess
 import pykka
+import pygame
 import time
+import RPi.GPIO as GPIO
+
+from pygame.locals import *
+
+# Set the display to fb1 - i.e. the TFT
+os.environ["SDL_FBDEV"] = "/dev/fb1"
+# Remove mouse
+os.environ["SDL_NOMOUSE"] = "1"
+# initialise pygame module
+pygame.init()
+# set up the window
+screen = pygame.display.set_mode((240, 320), 0, 32)
 
 DEFAULT_HOST = "10.5.5.1"
 logger = logging.getLogger()
@@ -78,6 +94,39 @@ MODES = {"j": "Joystick",
          "x": "Stop",
          ":": "Arduino Cmd",
          "?": "Help"}
+
+# dictionary of images to display when entering modes
+IMAGES = {"j": "joystick.png",
+          "r": "reverse.png",
+          "s": "speed.png",
+          "l": "line_follow.png",
+          "3": "3_pt_turn.png",
+          "b": "bowling.png",
+          "p": "proximity.png",
+          "c": "config.png",
+          "t": "test.png",
+          }
+
+
+class TraceConsumer(threading.Thread):
+    def __init__(self):
+        super(TraceConsumer, self).__init__()
+        self.ser = serial.Serial(port="/dev/ttyACM0",
+                                 baudrate=115200,
+                                 parity=serial.PARITY_NONE,
+                                 stopbits=serial.STOPBITS_ONE,
+                                 bytesize=serial.EIGHTBITS)
+        self.ser.open()
+        self.serial_log_file = open("seriallog.txt", 'w', 0)
+
+    def run(self):
+        line = None
+        while True:
+            try:
+                line = self.ser.readline()
+            except serial.SerialException:
+                print "Serial exception hit, ignoring"
+            self.serial_log_file.write(line)
 
 
 class Controller(threading.Thread):
@@ -227,6 +276,13 @@ class LocalController(Controller):
                     pos[1] = self.deadzone(float(_value) / -32767.0, 0.1)
                 elif _number == 0x03 or _number == 0x04:  # dmh
                     dmh = _value > 0
+                elif _number == 0x07:
+                    if _value > 0:
+                        # down
+                        retval["down"] = True
+                    elif _value < 0:
+                        # up
+                        retval["up"] = True
 
         if pos != self.lastpos:
             self.lastpos = pos
@@ -303,12 +359,13 @@ class Mode(pykka.ThreadingActor):
 
     @staticmethod
     def _xytospeeddirection(x, y):
-        def sign(x):
-            if x < 0:
+        def sign(num):
+            if num < 0:
                 return -1
             else:
                 return 1
-        speed = y * y * sign(y) * 2000.0      #  Use the squares of x and y to make it non-linear
+        # Use the squares of x and y to make it non-linear
+        speed = y * y * sign(y) * 1000.0
         direction = x * x * sign(x) * 200.0
         return int(speed), int(direction)
 
@@ -319,17 +376,41 @@ class JoystickMode(Mode):
     def __init__(self, arduino):
         logger.info("Start Joystick Mode")
         super(JoystickMode, self).__init__(arduino)
+        self._arduino_mode = 'j'
+        self.modelist = MODES.keys()
+
+        # Move J and RJ modes to the front to allow us to flip the robot
+        # direction quickly
+        self.modelist.insert(0, self.modelist.pop(self.modelist.index('j')))
+        self.modelist.insert(0, self.modelist.pop(self.modelist.index('r')))
 
     def controller_update(self, update):
         if "pos" in update:
-            speed, direction = self._xytospeeddirection(update["pos"][0], update["pos"][1])
+            speed, direction = self._xytospeeddirection(update["pos"][0],
+                                                        update["pos"][1])
             self._arduino.send_cmd("F {0:d} {1:d}".format(speed, direction))
         if "dmh" in update:
             self._arduino.send_cmd("D {0:d}".format(update["dmh"]))
+        if "down" in update:
+            self._cycle_mode(True)
+        if "up" in update:
+            self._cycle_mode(False)
 
     def mode_update(self, newmode):
         logger.info("New Mode : {}".format(MODES[newmode]))
         self._arduino.send_cmd("M {}".format(newmode.upper()))
+        self._arduino_mode = newmode
+        if newmode in IMAGES:
+            display_image(IMAGES[newmode])
+
+    def _cycle_mode(self, direction):
+        currentindex = self.modelist.index(self._arduino_mode)
+        if direction:
+            nextindex = (currentindex + 1) % len(self.modelist)
+            self.mode_update(self.modelist[nextindex])
+        else:
+            nextindex = (currentindex - 1) % len(self.modelist)
+            self.mode_update(self.modelist[nextindex])
 
     def send_cmd(self, cmd):
         logger.info("Command : {}".format(cmd))
@@ -341,6 +422,16 @@ class JoystickMode(Mode):
 
 
 def main(argv):
+    # Reset Arduino
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(17, GPIO.OUT)
+    GPIO.output(17, GPIO.HIGH)
+    time.sleep(0.1)
+    GPIO.output(17, GPIO.LOW)
+    GPIO.cleanup()
+    time.sleep(1)
+
+    print "Starting main"
     logging.basicConfig(level=logging.WARNING)
 
     host = DEFAULT_HOST
@@ -355,6 +446,10 @@ def main(argv):
         elif opt == '-d':
             logger.setLevel(level=logging.DEBUG)
 
+    print "starting serial logger"
+    command = "cat /dev/ttyACM0 > /home/pi/metabot2/seriallog.txt"
+    serial_logger = subprocess.Popen(command, shell=True)
+    print "starting arduino"
     arduino = Arduino.start().proxy()
     mode = JoystickMode.start(arduino).proxy()
     remote_controller = RemoteController(host, mode)
@@ -368,6 +463,7 @@ def main(argv):
     for mode in MODES:
         print mode, MODES[mode]
     modecmd = "j"
+    mode.mode_update('j')
     try:
         while modecmd != "q":
             modecmd = raw_input("New Mode :")
@@ -393,5 +489,17 @@ def main(argv):
     sys.exit()
 
 
+def display_image(filename):
+    """
+    Loads a file and displays it on the screen
+    :param filename: String containing the name of the file to load.
+    """
+    image = pygame.image.load(filename)
+    screen.blit(image, (0, 0))
+    pygame.display.flip()
+    pygame.display.update()
+
+
 if __name__ == "__main__":
+    print "Looks like I've been run - kicking off main"
     main(sys.argv[1:])
