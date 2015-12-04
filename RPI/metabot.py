@@ -362,7 +362,7 @@ class Mode(pykka.ThreadingActor):
             else:
                 return 1
         # Use the squares of x and y to make it non-linear
-        speed = y * y * sign(y) * 2000.0
+        speed = y * y * sign(y) * 1000.0
         direction = x * x * sign(x) * 200.0
         return int(speed), int(direction)
 
@@ -375,6 +375,11 @@ class JoystickMode(Mode):
         super(JoystickMode, self).__init__(arduino)
         self._arduino_mode = 'j'
         self.modelist = MODES.keys()
+
+        # Move J and RJ modes to the front to allow us to flip the robot
+        # direction quickly
+        self.modelist.insert(0, self.modelist.pop(self.modelist.index('j')))
+        self.modelist.insert(0, self.modelist.pop(self.modelist.index('rj')))
 
     def controller_update(self, update):
         if "pos" in update:
