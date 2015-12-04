@@ -59,23 +59,26 @@ import struct
 import json
 import getopt
 import logging
+import os
 import serial
 import pykka
 import pygame
 import time
 
+
+from itertools import cycle
 from pygame.locals import *
 
 # Set the display to fb1 - i.e. the TFT
 os.environ["SDL_FBDEV"] = "/dev/fb1"
 # Remove mouse
-os.environ["SDL_NOMOUSE"]="1"
+os.environ["SDL_NOMOUSE"] = "1"
 
 # initialise pygame module
 pygame.init()
 
 # set up the window
-screen = pygame.display.set_mode((320, 240), 0, 32)
+screen = pygame.display.set_mode((240, 320), 0, 32)
 
 DEFAULT_HOST = "10.5.5.1"
 logger = logging.getLogger()
@@ -103,8 +106,25 @@ IMAGES = {"j": "joystick.png",
           "p": "proximity.png",
           "c": "config.png",
           "t": "test.png",
-          ":": "arduino.png"
           }
+
+
+class TraceConsumer(threading.Thread):
+    def __init__(self):
+        super(TraceConsumer, self).__init__()
+        self.ser = serial.Serial(port="/dev/ttyACM0",
+                                 baudrate=115200,
+                                 parity=serial.PARITY_NONE,
+                                 stopbits=serial.STOPBITS_ONE,
+                                 bytesize=serial.EIGHTBITS)
+        self.ser.open()
+        self.serial_log_file = open("seriallog.txt", 'w', 0)
+
+    def run(self):
+        while True:
+            line = self.ser.readline()
+            self.serial_log_file.write(line)
+
 
 class Controller(threading.Thread):
     def __init__(self, mode):
@@ -253,6 +273,13 @@ class LocalController(Controller):
                     pos[1] = self.deadzone(float(_value) / -32767.0, 0.1)
                 elif _number == 0x03 or _number == 0x04:  # dmh
                     dmh = _value > 0
+                elif _number == 0x07:
+                    if _value > 0:
+                        # down
+                        retval["down"] = True
+                    elif _value < 0:
+                        # up
+                        retval["up"] = True
 
         if pos != self.lastpos:
             self.lastpos = pos
@@ -329,12 +356,13 @@ class Mode(pykka.ThreadingActor):
 
     @staticmethod
     def _xytospeeddirection(x, y):
-        def sign(x):
-            if x < 0:
+        def sign(num):
+            if num < 0:
                 return -1
             else:
                 return 1
-        speed = y * y * sign(y) * 2000.0      # Use the squares of x and y to make it non-linear
+        # Use the squares of x and y to make it non-linear
+        speed = y * y * sign(y) * 2000.0
         direction = x * x * sign(x) * 200.0
         return int(speed), int(direction)
 
@@ -345,17 +373,36 @@ class JoystickMode(Mode):
     def __init__(self, arduino):
         logger.info("Start Joystick Mode")
         super(JoystickMode, self).__init__(arduino)
+        self._arduino_mode = 'j'
+        self.modelist = MODES.keys()
 
     def controller_update(self, update):
         if "pos" in update:
-            speed, direction = self._xytospeeddirection(update["pos"][0], update["pos"][1])
+            speed, direction = self._xytospeeddirection(update["pos"][0],
+                                                        update["pos"][1])
             self._arduino.send_cmd("F {0:d} {1:d}".format(speed, direction))
         if "dmh" in update:
             self._arduino.send_cmd("D {0:d}".format(update["dmh"]))
+        if "down" in update:
+            self._cycle_mode(True)
+        if "up" in update:
+            self._cycle_mode(False)
 
     def mode_update(self, newmode):
         logger.info("New Mode : {}".format(MODES[newmode]))
         self._arduino.send_cmd("M {}".format(newmode.upper()))
+        self._arduino_mode = newmode
+        if newmode in IMAGES:
+            display_image(IMAGES[newmode])
+
+    def _cycle_mode(self, direction):
+        currentindex = self.modelist.index(self._arduino_mode)
+        if direction:
+            nextindex = (currentindex + 1) % len(self.modelist)
+            self.mode_update(self.modelist[nextindex])
+        else:
+            nextindex = (currentindex - 1) % len(self.modelist)
+            self.mode_update(self.modelist[nextindex])
 
     def send_cmd(self, cmd):
         logger.info("Command : {}".format(cmd))
@@ -381,6 +428,9 @@ def main(argv):
         elif opt == '-d':
             logger.setLevel(level=logging.DEBUG)
 
+    serial_logger = TraceConsumer()
+    serial_logger.daemon = True
+    serial_logger.start()
     arduino = Arduino.start().proxy()
     mode = JoystickMode.start(arduino).proxy()
     remote_controller = RemoteController(host, mode)
@@ -394,6 +444,7 @@ def main(argv):
     for s in MODES:
         print s, MODES[s]
     modecmd = "j"
+    mode.mode_update('j')
     try:
         while modecmd != "q":
             modecmd = raw_input("New Mode :")
@@ -403,11 +454,9 @@ def main(argv):
             elif modecmd == "x":
                 mode.send_cmd("X")
             elif len(modecmd) > 0 and modecmd[0] == ":":
-                display_image(IMAGES[modecmd])
                 mode.send_cmd(modecmd[1:])
             elif modecmd in MODES and modecmd != "q":
                 print("  Entering Mode : {}".format(MODES[modecmd]))
-                display_image(IMAGES[modecmd])
                 mode.mode_update(modecmd)
     except KeyboardInterrupt:
         pass
