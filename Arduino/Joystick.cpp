@@ -139,7 +139,7 @@ void Joystick::setForward(int arg_cnt, char **args) {
 		if (_normdir)
 			motors.setSpeedDirection(speed, direction);
 		else
-			motors.setSpeedDirection(-speed, -direction);
+			motors.setSpeedDirection(-speed, direction);
 
 		motors.setEnableOutputs(true);
 	}

@@ -14,6 +14,9 @@
 int speedthreshold[] = {1000,	1300,	1600, 2000, 100000};
 int accelrate[]		  = {1000,	800,	500,  300,    0};
 
+//int speedthreshold[] = {1000,		1400,	 16000, 20000, 100000};
+//int accelrate[]		  = {3000,	 3000,	  0, 0,    0};
+
 void SpeedTest::start()
 {
 	SerialUSB.println("Start Speed Test Mode");
@@ -73,7 +76,7 @@ void SpeedTest::loop()
 	int error = leftlight - rightlight;     // Look at the difference between the left and right detectors
 	if (abs(error) > ERRTHRESHOLD)
 	{
-		int newdir = ((error - 20) * speed) / 2500;
+		int newdir = ((error + 20) * speed) / 2500;
 		if (newdir != motors.currentDirection())
 		{
 			//SerialUSB.print("Set Direction : ");

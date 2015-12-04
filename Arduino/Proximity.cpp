@@ -3,6 +3,23 @@
 #include "CmdUSB.h"
 
 
+Proximity::Proximity()
+{
+	stoppingdistance = STOPPINGDISTANCE;
+
+	// Assign some default thresholds in case we can't do a config run
+	val70[0] = 770.0;
+	val70[1] = 634.0;
+	val70[2] = 710.0;
+	val500[0] = 48.0;
+	val500[1] = 36.0;
+	val500[2] = 43.0;
+
+	for (int i = 0; i < 3; i++)
+		lastAverage[i] = 0;
+
+}
+
 void Proximity::start()
 {
 	SerialUSB.println("Proximity Alert Mode");
@@ -11,18 +28,6 @@ void Proximity::start()
 	m_currentSpeed = 0;
 	m_running = false;
 	m_config = false;
-	stoppingdistance = STOPPINGDISTANCE;
-
-	// Assign some default thresholds in case we can't do a config run
-	val70[0] = 864.0;
-	val70[1] = 738.0;
-	val70[2] = 832.0;
-	val500[0] = 56.0;
-	val500[1] = 48.0;
-	val500[2] = 50.0;
-
-	for (int i = 0; i < 3; i++)
-		lastAverage[i] = 0;
 
 	// Enable lights
 	lights.setEnabled(true);

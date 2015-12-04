@@ -63,7 +63,6 @@ void Motors::loop()
 		if ((_targetL <= mLCount) ||  (_targetR <= mRCount))
 		{
 			stop();
-			resetTargetPosition();
 		}
 		else
 		{
@@ -140,6 +139,7 @@ void Motors::stop()
 	_targetDirection = 0.0;
 	_stopping = true;
 	_stopMillis = millis();
+	resetTargetPosition();
 
 	L->setSpeed(0.0);
 	R->setSpeed(0.0);

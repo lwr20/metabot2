@@ -12,11 +12,11 @@
 #include "modebase.h"
 #include <Servo.h>
 
-#define JOYACCELERATION			1000
+#define JOYACCELERATION			2000
 #define JOYROTACCELERATION		1000
 #define SERVOPIN 13
-#define SERVOON 30
-#define SERVOOFF 120
+#define SERVOON 180
+#define SERVOOFF 65
 
 class Joystick : public ModeBase
 {

@@ -21,6 +21,7 @@
 class Proximity : public ModeBase
 {
 public:
+	Proximity();
 	void start();
 	void stop();
 	void loop();
